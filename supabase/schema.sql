@@ -87,13 +87,15 @@ begin
 
   v_drawn := exists (select 1 from assignments);
 
-  -- Late joiner: grab a random team that nobody has yet (before inserting, so a
+  -- Late joiner: grab the best team nobody has yet (before inserting, so a
   -- clean error if none remain — the whole function is one transaction anyway).
   if v_drawn then
+    -- Best still-unassigned team by ranking (teams are stored strongest-first),
+    -- so a late joiner brings the next team down the list into play.
     select t into v_team
     from unnest(v_teams) as t
     where t not in (select team from assignments)
-    order by random()
+    order by array_position(v_teams, t)
     limit 1;
 
     if v_team is null then
@@ -113,8 +115,11 @@ end;
 $$;
 
 -- --- run_draw ---------------------------------------------------------------
--- Admin-only. Verifies the passcode, then (idempotently) shuffles the team pool
--- and assigns one team per player. Refuses to re-draw once assignments exist.
+-- Admin-only. Verifies the passcode, then (idempotently) deals out the TOP N
+-- teams of the pool (N = number of players; teams are stored strongest-first)
+-- and randomly assigns one to each player. Refuses to re-draw once assignments
+-- exist. So 10 players → the top 10 teams are in play; weaker pool teams only
+-- enter if more friends join (incl. late joiners, see join_lobby).
 
 create or replace function public.run_draw(p_passcode text)
 returns void
@@ -125,6 +130,7 @@ as $$
 declare
   v_pass  text;
   v_teams text[];
+  v_count int;
 begin
   select passcode, teams into v_pass, v_teams from config where id = 1;
   if v_pass is null then
@@ -139,16 +145,18 @@ begin
     raise exception 'ALREADY_DRAWN' using hint = 'The lottery has already been drawn.';
   end if;
 
-  if not exists (select 1 from players) then
+  select count(*) into v_count from players;
+  if v_count = 0 then
     raise exception 'NO_PLAYERS' using hint = 'Nobody has signed up yet.';
   end if;
 
-  if (select count(*) from players) > coalesce(array_length(v_teams, 1), 0) then
+  if v_count > coalesce(array_length(v_teams, 1), 0) then
     raise exception 'NOT_ENOUGH_TEAMS'
       using hint = 'There are more players than teams in the pool.';
   end if;
 
-  -- Pair each player (random order) with a team (random order) by row number.
+  -- Pair each player (random order) with one of the TOP N teams (v_teams[1:N],
+  -- in random order) by row number.
   insert into assignments (player_id, team)
   select p.id, t.team
   from (
@@ -157,7 +165,7 @@ begin
   ) p
   join (
     select team, row_number() over (order by random()) as rn
-    from unnest(v_teams) as team
+    from unnest(v_teams[1:v_count]) as team
   ) t on t.rn = p.rn;
 end;
 $$;
@@ -174,12 +182,15 @@ grant execute on function public.run_draw(text)   to anon;
 --   * passcode: a secret only you know — needed to run the draw.
 -- These are placeholders so the flow is testable immediately.
 -- ===========================================================================
+-- teams MUST be ordered strongest-first: run_draw deals out the top N teams
+-- (N = number of players). Source: Opta Analyst top-20 win odds, 1 Jun 2026.
 insert into public.config (id, teams, max_players, passcode)
 values (
   1,
-  array['Spain','France','England','Portugal','Brazil',
-        'Argentina','Germany','Netherlands','Norway'],
-  9,
+  array['Spain','France','England','Argentina','Portugal','Brazil','Germany',
+        'Netherlands','Norway','Belgium','Colombia','Morocco','Uruguay',
+        'Switzerland','Croatia','Ecuador','Japan','USA','Senegal','Mexico'],
+  20,
   'change-me'
 )
 on conflict (id) do update

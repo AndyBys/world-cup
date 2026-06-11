@@ -142,8 +142,11 @@ function PoolTable({ flags }: { flags: Map<string, string> }) {
   const max = rows[0]?.prob ?? 1;
   return (
     <section className="card pool-card">
-      <h2>🎟️ The draw pool — {rows.length} teams up for grabs</h2>
-      <p className="muted small">Odds to win the World Cup for each team you could be drawn.</p>
+      <h2>🎟️ The draw pool — top {rows.length} teams</h2>
+      <p className="muted small">
+        Odds to win the World Cup. The draw deals out the strongest teams first —
+        one per player — so the more friends join, the further down the list it goes.
+      </p>
       <ul className="pool-list">
         {rows.map((r) => (
           <li key={r.team} className="pool-row">
