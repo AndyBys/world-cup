@@ -6,6 +6,7 @@ import { getTeams, Team } from '../lib/worldcup';
 import { CURRENCIES, convert, getRates } from '../lib/currency';
 import { poolByOdds } from '../lib/pool';
 import { TeamPill } from '../components/TeamPill';
+import { TodayMatches } from '../components/TodayMatches';
 
 const MY_ID_KEY = 'wc26_player_id';
 
@@ -91,6 +92,8 @@ export function Lobby() {
           onJoined={handleJoined}
         />
       )}
+
+      <TodayMatches />
 
       <PoolTable flags={flags} />
 

@@ -463,6 +463,52 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 }
 
 /* ===========================================================================
+   Today / tomorrow fixtures board
+   =========================================================================== */
+.today-card h2 { margin-bottom: 6px; }
+.day-block { margin-top: 14px; }
+.day-head { display: flex; align-items: baseline; gap: 9px; margin-bottom: 6px; }
+.day-title { font-weight: 800; font-size: 0.95rem; color: var(--gold); letter-spacing: 0.02em; }
+.day-sub { font-size: 0.78rem; color: var(--muted); }
+.fixtures { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.fixture {
+  display: grid;
+  grid-template-columns: 74px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: var(--surface);
+}
+.fixture.live { background: rgba(255, 77, 77, 0.08); box-shadow: inset 3px 0 0 #ff4d4d; }
+.fixture.clash { box-shadow: inset 3px 0 0 var(--gold); }
+.fx-time { font-size: 0.82rem; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fx-match { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+.fx-team { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; color: var(--text); font-weight: 600; }
+.fx-team.placeholder { color: var(--muted); font-weight: 500; }
+.fx-team:not(.placeholder):hover .fx-name { color: var(--gold); }
+.fx-flag { font-size: 1.05rem; }
+.fx-owner { font-size: 0.6rem; font-weight: 700; color: var(--gold); white-space: nowrap; }
+.fx-score { font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
+.fx-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; text-align: right; }
+.fx-stage { font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
+.fx-where { font-size: 0.68rem; color: rgba(139, 150, 173, 0.7); white-space: nowrap; }
+.fx-clash-tag {
+  grid-column: 1 / -1;
+  justify-self: start;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: #1a1505;
+  background: linear-gradient(90deg, var(--gold), #f0d589);
+}
+@media (max-width: 560px) {
+  .fixture { grid-template-columns: 68px 1fr; }
+  .fx-meta { grid-column: 2; align-items: flex-start; text-align: left; }
+}
+
+/* ===========================================================================
    Draw pool — teams up for grabs + win probability
    =========================================================================== */
 .pool-card h2 { margin-bottom: 2px; }
