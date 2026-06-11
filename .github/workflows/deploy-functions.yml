@@ -1,0 +1,29 @@
+name: Deploy Supabase Functions
+
+# Deploys the live-scores Edge Function to Supabase. Runs when the function
+# changes (or manually). Separate from the Pages deploy so a docs/UI change
+# doesn't redeploy the function and vice-versa.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - '.github/workflows/deploy-functions.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      # Create at: Supabase dashboard → Account → Access Tokens, then add it as a
+      # repo secret named SUPABASE_ACCESS_TOKEN (Settings → Secrets → Actions).
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      # Project ref is the subdomain of your Supabase URL (public, not a secret).
+      PROJECT_REF: lmjanuwzvihbffhayxws
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Deploy live-scores function
+        run: supabase functions deploy live-scores --no-verify-jwt --project-ref "$PROJECT_REF"

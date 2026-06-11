@@ -12,12 +12,14 @@ export function Standings({
   highlight,
   linkTeams = false,
   compact = false,
+  owners,
 }: {
   rows: StandingRow[];
   flags: Map<string, string>;
   highlight?: string;
   linkTeams?: boolean;
   compact?: boolean;
+  owners?: Map<string, string>;
 }) {
   return (
     <table className={`standings ${compact ? 'compact' : ''}`}>
@@ -38,8 +40,9 @@ export function Standings({
         {rows.map((r, i) => {
           // Top two qualify directly at this format; mark them subtly.
           const qualifies = i < 2;
+          const owner = owners?.get(r.team);
           return (
-            <tr key={r.team} className={r.team === highlight ? 'me' : ''}>
+            <tr key={r.team} className={`${r.team === highlight ? 'me' : ''} ${owner ? 'owned' : ''}`}>
               <td className="team-cell">
                 <span className={qualifies ? 'qual-dot' : 'qual-dot dim'} />
                 {linkTeams ? (
@@ -50,6 +53,7 @@ export function Standings({
                     <span className="tp-name">{r.team}</span>
                   </span>
                 )}
+                {owner && <span className="owner-tag">🎟️ {owner}</span>}
               </td>
               <td>{r.played}</td>
               <td>{r.won}</td>

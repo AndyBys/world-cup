@@ -41,7 +41,10 @@ let teamsCache: Promise<Team[]> | null = null;
 
 export function getMatches(): Promise<Match[]> {
   if (!matchesCache) {
-    matchesCache = fetch(`${BASE}/worldcup.json`)
+    // Cache-bust in 5-minute buckets so a long-lived tab (and the CDN/browser
+    // cache) picks up freshly-entered scores on match days without a hard reload.
+    const bucket = Math.floor(Date.now() / 300_000);
+    matchesCache = fetch(`${BASE}/worldcup.json?cb=${bucket}`)
       .then((r) => {
         if (!r.ok) throw new Error(`Failed to load fixtures (${r.status})`);
         return r.json() as Promise<WorldCupFile>;
@@ -53,6 +56,12 @@ export function getMatches(): Promise<Match[]> {
       });
   }
   return matchesCache;
+}
+
+/** Drops the in-memory fixtures cache so the next getMatches() refetches. */
+export function refreshMatches(): Promise<Match[]> {
+  matchesCache = null;
+  return getMatches();
 }
 
 export function getTeams(): Promise<Team[]> {
@@ -231,6 +240,40 @@ export function isPlayed(m: Match): boolean {
   return Array.isArray(m.score?.ft);
 }
 
+/**
+ * Kick-off time as a UTC epoch (ms). Parses openfootball's "13:00 UTC-6" form.
+ * Returns null if the time string can't be parsed.
+ */
+export function kickoffMs(m: Match): number | null {
+  const t = /^(\d{1,2}):(\d{2})\s*UTC([+-]\d{1,2})?/.exec(m.time);
+  if (!t) return null;
+  const [, hh, mm, off] = t;
+  const offset = off ? Number(off) : 0;
+  const [y, mo, d] = m.date.split('-').map(Number);
+  // Local kick-off at UTC<offset> → UTC epoch: subtract the offset hours.
+  return Date.UTC(y, mo - 1, d, Number(hh) - offset, Number(mm));
+}
+
+export type MatchStatus = 'upcoming' | 'live' | 'finished';
+
+/** ~2.5h window covers 90'+ stoppage/half-time (and extra time in knockouts). */
+const LIVE_WINDOW_MS = 2.5 * 60 * 60 * 1000;
+
+/**
+ * Scheduled status of a match. NOTE: openfootball is community-edited, not a
+ * real-time score feed — "live" means the match is *scheduled* to be in progress
+ * right now, not that we have a ticking score. Once a final score lands it flips
+ * to "finished".
+ */
+export function matchStatus(m: Match, now: number = Date.now()): MatchStatus {
+  if (isPlayed(m)) return 'finished';
+  const k = kickoffMs(m);
+  if (k == null) return 'upcoming';
+  if (now < k) return 'upcoming';
+  if (now < k + LIVE_WINDOW_MS) return 'live';
+  return 'finished'; // window has passed; score simply not in the feed yet
+}
+
 /** All matches involving a team, chronologically. */
 export async function getTeamMatches(name: string): Promise<Match[]> {
   const matches = await getMatches();
@@ -257,6 +300,11 @@ export interface StandingRow {
  */
 export async function getGroupStandings(group: string): Promise<StandingRow[]> {
   const matches = await getMatches();
+  return computeStandings(matches, group);
+}
+
+/** Pure standings computation from a set of matches (overlay live scores first). */
+export function computeStandings(matches: Match[], group: string): StandingRow[] {
   const groupMatches = matches.filter((m) => m.group === group);
 
   const table = new Map<string, StandingRow>();

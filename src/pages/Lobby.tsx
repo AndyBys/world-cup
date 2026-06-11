@@ -4,6 +4,7 @@ import { supabase, friendlyError, Player } from '../lib/supabase';
 import { STAKE, TOURNAMENT_NAME } from '../lib/config';
 import { getTeams, Team } from '../lib/worldcup';
 import { CURRENCIES, convert, getRates } from '../lib/currency';
+import { poolByOdds } from '../lib/pool';
 import { TeamPill } from '../components/TeamPill';
 
 const MY_ID_KEY = 'wc26_player_id';
@@ -91,6 +92,8 @@ export function Lobby() {
         />
       )}
 
+      <PoolTable flags={flags} />
+
       {!drawn && <AdminStrip onDrew={() => loadState().then(setState).catch(() => {})} />}
     </div>
   );
@@ -127,6 +130,32 @@ function PotBanner({ pot, drawn, count }: { pot: number; drawn: boolean; count: 
         </div>
       )}
     </div>
+  );
+}
+
+/** The teams up for grabs in the draw, with each team's win probability. */
+function PoolTable({ flags }: { flags: Map<string, string> }) {
+  const rows = poolByOdds();
+  const max = rows[0]?.prob ?? 1;
+  return (
+    <section className="card pool-card">
+      <h2>🎟️ The draw pool — {rows.length} teams up for grabs</h2>
+      <p className="muted small">Odds to win the World Cup for each team you could be drawn.</p>
+      <ul className="pool-list">
+        {rows.map((r) => (
+          <li key={r.team} className="pool-row">
+            <Link className="pool-team" to={`/team/${encodeURIComponent(r.team)}`}>
+              <span className="pool-flag">{flags.get(r.team) ?? '⚽'}</span>
+              <span className="pool-name">{r.team}</span>
+            </Link>
+            <span className="pool-bar-wrap">
+              <span className="pool-bar" style={{ width: `${(r.prob / max) * 100}%` }} />
+            </span>
+            <span className="pool-prob">{Math.round(r.prob)}%</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

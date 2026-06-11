@@ -410,6 +410,148 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 .badge.L { background: #c4544d; }
 
 /* ===========================================================================
+   Live-match highlighting
+   =========================================================================== */
+.live-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #ff4d4d;
+  box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7);
+  animation: live-pulse 1.6s ease-out infinite;
+  flex: 0 0 auto;
+}
+@keyframes live-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.6); }
+  70%  { box-shadow: 0 0 0 7px rgba(255, 77, 77, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
+}
+
+/* "LIVE" pill (auto width, overrides the square W/D/L badge sizing). */
+.badge.live {
+  width: auto; height: auto;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #ff4d4d;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+}
+
+/* "Live now" card on the team page. */
+.live-card {
+  border-color: rgba(255, 77, 77, 0.5);
+  box-shadow: 0 0 0 1px rgba(255, 77, 77, 0.3), 0 18px 40px -22px rgba(255, 77, 77, 0.45);
+}
+.live-card h2 { display: flex; align-items: center; gap: 9px; }
+.match.live { background: rgba(255, 77, 77, 0.08); border-radius: 10px; }
+
+/* Live match box in the bracket. */
+.mbox.live {
+  border-color: rgba(255, 77, 77, 0.65);
+  box-shadow: 0 0 0 1px rgba(255, 77, 77, 0.4);
+}
+.mbox-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #ff6b6b;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* ===========================================================================
+   Draw pool — teams up for grabs + win probability
+   =========================================================================== */
+.pool-card h2 { margin-bottom: 2px; }
+.pool-list { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.pool-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(80px, 2fr) 44px;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 8px;
+  border-radius: 10px;
+}
+.pool-row:hover { background: var(--surface); }
+.pool-team { display: flex; align-items: center; gap: 9px; text-decoration: none; color: var(--text); min-width: 0; }
+.pool-team:hover .pool-name { color: var(--gold); }
+.pool-flag { font-size: 1.15rem; flex: 0 0 auto; }
+.pool-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pool-bar-wrap { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+.pool-bar {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold-deep), var(--gold));
+}
+.pool-prob { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--gold); }
+
+/* ===========================================================================
+   Friends' teams — ownership tags & friend-vs-friend "clash" highlighting
+   =========================================================================== */
+/* A friend owns this team (in a standings row). */
+.owner-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--gold);
+  background: rgba(214, 178, 92, 0.14);
+  border: 1px solid rgba(214, 178, 92, 0.35);
+}
+.standings tr.owned td { background: rgba(214, 178, 92, 0.06); }
+.chip.owner { color: var(--gold); border-color: rgba(214, 178, 92, 0.45); background: rgba(214, 178, 92, 0.12); }
+
+/* Owner tag inside a bracket match box (sits under the team name). */
+.mside-owner {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-top: 1px;
+  color: var(--gold);
+}
+.mside.owned { background: rgba(214, 178, 92, 0.07); }
+
+/* Two friends' teams meet — make it pop. */
+.mbox.clash {
+  border-color: rgba(214, 178, 92, 0.7);
+  box-shadow: 0 0 0 1px rgba(214, 178, 92, 0.45), 0 14px 32px -20px rgba(214, 178, 92, 0.6);
+}
+.clash-ribbon {
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 2px 4px;
+  color: #1a1505;
+  background: linear-gradient(90deg, var(--gold), #f0d589);
+  border-radius: 6px 6px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Clash hint on a team-page fixture row. */
+.clash-tag {
+  margin-left: 7px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: #1a1505;
+  background: linear-gradient(90deg, var(--gold), #f0d589);
+  white-space: nowrap;
+}
+.match.clash { box-shadow: inset 3px 0 0 var(--gold); }
+
+/* ===========================================================================
    Knockout draw sheet (two-sided bracket)
    =========================================================================== */
 .draw-scroll { overflow-x: auto; padding: 8px 18px 28px; -webkit-overflow-scrolling: touch; }

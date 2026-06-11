@@ -1,52 +1,61 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  getGroupLabels,
-  getGroupStandings,
+  getMatches,
   getBracket,
   getFlagMap,
+  refreshMatches,
+  computeStandings,
   Bracket as BracketData,
-  StandingRow,
+  Match,
 } from '../lib/worldcup';
+import { overlayFinished } from '../lib/live';
+import { useClock, useLiveScores } from '../lib/useLive';
+import { useOwners } from '../lib/owners';
 import { Standings } from '../components/Standings';
 import { Bracket } from '../components/Bracket';
 
-interface GroupData {
-  label: string;
-  rows: StandingRow[];
-}
-
 export function Tournament() {
-  const [groups, setGroups] = useState<GroupData[] | null>(null);
+  const [matches, setMatches] = useState<Match[] | null>(null);
   const [bracket, setBracket] = useState<BracketData | null>(null);
   const [flags, setFlags] = useState<Map<string, string>>(new Map());
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'groups' | 'bracket'>('bracket');
+  const now = useClock();
+  const liveIdx = useLiveScores();
+  const owners = useOwners();
 
   useEffect(() => {
     let alive = true;
-    (async () => {
+    const load = async (refresh = false) => {
       try {
-        const [labels, flagMap, br] = await Promise.all([
-          getGroupLabels(),
+        const [ms, flagMap, br] = await Promise.all([
+          refresh ? refreshMatches() : getMatches(),
           getFlagMap(),
           getBracket(),
         ]);
         if (!alive) return;
+        setMatches(ms);
         setFlags(flagMap);
         setBracket(br);
-        const data = await Promise.all(
-          labels.map(async (label) => ({ label, rows: await getGroupStandings(label) })),
-        );
-        if (alive) setGroups(data);
       } catch (e) {
         if (alive) setError(e instanceof Error ? e.message : 'Failed to load tournament data.');
       }
-    })();
+    };
+    load();
+    const id = setInterval(() => load(true), 60_000);
     return () => {
       alive = false;
+      clearInterval(id);
     };
   }, []);
+
+  const groups = useMemo(() => {
+    if (!matches) return null;
+    const overlaid = overlayFinished(matches, liveIdx);
+    const labels = [...new Set(overlaid.map((m) => m.group).filter(Boolean) as string[])].sort();
+    return labels.map((label) => ({ label, rows: computeStandings(overlaid, label) }));
+  }, [matches, liveIdx]);
 
   return (
     <div className="page">
@@ -75,7 +84,7 @@ export function Tournament() {
         (!bracket ? (
           <p className="muted center">Loading bracket…</p>
         ) : (
-          <Bracket data={bracket} flags={flags} />
+          <Bracket data={bracket} flags={flags} now={now} liveIdx={liveIdx} owners={owners} />
         ))}
 
       {tab === 'groups' && (
@@ -87,7 +96,7 @@ export function Tournament() {
               {groups.map((g) => (
                 <section key={g.label} className="card group-card">
                   <h2>{g.label}</h2>
-                  <Standings rows={g.rows} flags={flags} linkTeams compact />
+                  <Standings rows={g.rows} flags={flags} linkTeams compact owners={owners} />
                 </section>
               ))}
             </div>
