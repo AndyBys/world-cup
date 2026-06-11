@@ -1,0 +1,1 @@
+{"root":["./src/main.tsx","./src/vite-env.d.ts","./src/components/Bracket.tsx","./src/components/Standings.tsx","./src/components/TeamPill.tsx","./src/lib/config.ts","./src/lib/currency.ts","./src/lib/supabase.ts","./src/lib/worldcup.ts","./src/pages/Lobby.tsx","./src/pages/Team.tsx","./src/pages/Tournament.tsx","./vite.config.ts"],"version":"5.9.3"}
