@@ -10,6 +10,7 @@ create table if not exists public.players (
   id         uuid primary key default gen_random_uuid(),
   name       text not null,
   name_key   text not null unique,          -- lower(trim(name)), used for dedupe
+  is_ultra   boolean not null default false, -- opted into ultra-gamble at sign-up
   created_at timestamptz not null default now()
 );
 
@@ -23,8 +24,10 @@ create table if not exists public.assignments (
 create table if not exists public.config (
   id          int primary key default 1,
   teams       text[]  not null,             -- the prize pool (>= max_players entries)
+  ultra_teams text[]  not null default '{}',-- the ultra-gamble underdog pool
   max_players int     not null default 9,
   passcode    text    not null,             -- admin draw secret; never exposed to clients
+  drawn       boolean not null default false,-- set true by run_draw (lobby phase flag)
   constraint config_singleton check (id = 1)
 );
 
@@ -71,7 +74,7 @@ begin
     raise exception 'EMPTY_NAME' using hint = 'Please enter your name.';
   end if;
 
-  select max_players, teams into v_max, v_teams from config where id = 1;
+  select max_players, teams, drawn into v_max, v_teams, v_drawn from config where id = 1;
   if v_max is null then
     raise exception 'NO_CONFIG' using hint = 'Game is not configured yet.';
   end if;
@@ -85,10 +88,9 @@ begin
     raise exception 'DUPLICATE_NAME' using hint = 'That name is already taken.';
   end if;
 
-  v_drawn := exists (select 1 from assignments);
-
-  -- Late joiner: grab the best team nobody has yet (before inserting, so a
-  -- clean error if none remain — the whole function is one transaction anyway).
+  -- Late joiner (keyed off the draw flag, not assignment existence — ultra
+  -- players hold assignments before the main draw runs). Grab the best team
+  -- nobody has yet, before inserting, so a clean error if none remain.
   if v_drawn then
     -- Best still-unassigned team by ranking (teams are stored strongest-first),
     -- so a late joiner brings the next team down the list into play.
@@ -130,9 +132,10 @@ as $$
 declare
   v_pass  text;
   v_teams text[];
+  v_drawn boolean;
   v_count int;
 begin
-  select passcode, teams into v_pass, v_teams from config where id = 1;
+  select passcode, teams, drawn into v_pass, v_teams, v_drawn from config where id = 1;
   if v_pass is null then
     raise exception 'NO_CONFIG' using hint = 'Game is not configured yet.';
   end if;
@@ -141,13 +144,19 @@ begin
     raise exception 'BAD_PASSCODE' using hint = 'Wrong admin passcode.';
   end if;
 
-  if exists (select 1 from assignments) then
+  if v_drawn then
     raise exception 'ALREADY_DRAWN' using hint = 'The lottery has already been drawn.';
   end if;
 
-  select count(*) into v_count from players;
+  -- Only players still without a team (ultra players are pre-assigned).
+  select count(*) into v_count
+  from players p
+  where not exists (select 1 from assignments a where a.player_id = p.id);
+
   if v_count = 0 then
-    raise exception 'NO_PLAYERS' using hint = 'Nobody has signed up yet.';
+    -- Everyone went ultra (or nobody to deal to): mark drawn and stop.
+    update config set drawn = true where id = 1;
+    return;
   end if;
 
   if v_count > coalesce(array_length(v_teams, 1), 0) then
@@ -155,24 +164,98 @@ begin
       using hint = 'There are more players than teams in the pool.';
   end if;
 
-  -- Pair each player (random order) with one of the TOP N teams (v_teams[1:N],
-  -- in random order) by row number.
+  -- Pair each not-yet-assigned player (random order) with one of the TOP N
+  -- pool teams (v_teams[1:N], random order) by row number. Ultra teams are a
+  -- disjoint pool, so the top N normal teams are always free here.
   insert into assignments (player_id, team)
   select p.id, t.team
   from (
     select id, row_number() over (order by random()) as rn
-    from players
+    from players p2
+    where not exists (select 1 from assignments a where a.player_id = p2.id)
   ) p
   join (
     select team, row_number() over (order by random()) as rn
     from unnest(v_teams[1:v_count]) as team
   ) t on t.rn = p.rn;
+
+  update config set drawn = true where id = 1;
 end;
+$$;
+
+-- --- join_ultra -------------------------------------------------------------
+-- Ultra-gamble sign-up: adds a player and instantly assigns a random,
+-- still-unassigned underdog from config.ultra_teams. Same name/capacity/dedupe
+-- rules as join_lobby; rejects (ULTRA_FULL) when all 8 underdogs are taken.
+
+create or replace function public.join_ultra(p_name text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_name  text := btrim(coalesce(p_name, ''));
+  v_key   text := lower(v_name);
+  v_max   int;
+  v_ultra text[];
+  v_count int;
+  v_team  text;
+  v_id    uuid;
+begin
+  if v_name = '' then
+    raise exception 'EMPTY_NAME' using hint = 'Please enter your name.';
+  end if;
+
+  select max_players, ultra_teams into v_max, v_ultra from config where id = 1;
+  if v_max is null then
+    raise exception 'NO_CONFIG' using hint = 'Game is not configured yet.';
+  end if;
+
+  select count(*) into v_count from players;
+  if v_count >= v_max then
+    raise exception 'LOBBY_FULL' using hint = 'The lobby is full.';
+  end if;
+
+  if exists (select 1 from players where name_key = v_key) then
+    raise exception 'DUPLICATE_NAME' using hint = 'That name is already taken.';
+  end if;
+
+  select t into v_team
+  from unnest(v_ultra) as t
+  where t not in (select team from assignments)
+  order by random()
+  limit 1;
+
+  if v_team is null then
+    raise exception 'ULTRA_FULL'
+      using hint = 'All ultra underdogs are taken — join the normal lottery.';
+  end if;
+
+  insert into players (name, name_key, is_ultra) values (v_name, v_key, true)
+    returning id into v_id;
+  insert into assignments (player_id, team) values (v_id, v_team);
+
+  return v_id;
+end;
+$$;
+
+-- --- is_drawn ---------------------------------------------------------------
+-- Anon can't read config (it holds the passcode), so expose just the draw flag.
+create or replace function public.is_drawn()
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select coalesce((select drawn from config where id = 1), false);
 $$;
 
 -- Allow the anonymous (public) API role to call the two functions.
 grant execute on function public.join_lobby(text) to anon;
 grant execute on function public.run_draw(text)   to anon;
+grant execute on function public.join_ultra(text) to anon;
+grant execute on function public.is_drawn()       to anon;
 
 -- ===========================================================================
 -- SEED — EDIT THIS before playing.
@@ -184,16 +267,20 @@ grant execute on function public.run_draw(text)   to anon;
 -- ===========================================================================
 -- teams MUST be ordered strongest-first: run_draw deals out the top N teams
 -- (N = number of players). Source: Opta Analyst top-20 win odds, 1 Jun 2026.
-insert into public.config (id, teams, max_players, passcode)
+insert into public.config (id, teams, ultra_teams, max_players, passcode)
 values (
   1,
   array['Spain','France','England','Argentina','Portugal','Brazil','Germany',
         'Netherlands','Norway','Belgium','Colombia','Morocco','Uruguay',
         'Switzerland','Croatia','Ecuador','Japan','USA','Senegal','Mexico'],
+  -- ultra-gamble underdog pool (must match src/lib/ultra.ts):
+  array['Curaçao','Haiti','Iraq','Cape Verde','Jordan','Uzbekistan',
+        'New Zealand','Panama'],
   20,
   'change-me'
 )
 on conflict (id) do update
   set teams = excluded.teams,
+      ultra_teams = excluded.ultra_teams,
       max_players = excluded.max_players,
       passcode = excluded.passcode;

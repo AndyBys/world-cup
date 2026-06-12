@@ -17,6 +17,7 @@ export interface Player {
   id: string;
   name: string;
   created_at: string;
+  is_ultra?: boolean;
 }
 
 export interface Assignment {
@@ -43,6 +44,7 @@ export function friendlyError(message: string): string {
     NO_TEAMS_LEFT: 'The draw is done and every team is already taken — no spots left.',
     NO_PLAYERS: 'Nobody has signed up yet.',
     NOT_ENOUGH_TEAMS: 'There are more players than teams in the pool.',
+    ULTRA_FULL: '🎰 Ultra-pool busted — all 8 underdogs are taken. Join the normal lottery instead.',
   };
   for (const code of Object.keys(map)) {
     if (message.includes(code)) return map[code];
