@@ -466,6 +466,40 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--green); }
    Today / tomorrow fixtures board
    =========================================================================== */
 .today-card h2 { margin-bottom: 6px; }
+.today-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.today-head h2 { margin-bottom: 0; }
+
+/* Timezone picker */
+.tz-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 8px 3px 10px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.tz-picker:hover { border-color: var(--border-2); }
+.tz-icon { font-size: 0.85rem; }
+.tz-picker select {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  outline: none;
+  max-width: 12rem;
+}
+.tz-picker select option { background: var(--bg-1); color: var(--text); }
 .day-block { margin-top: 14px; }
 .day-head { display: flex; align-items: baseline; gap: 9px; margin-bottom: 6px; }
 .day-title { font-weight: 800; font-size: 0.95rem; color: var(--gold); letter-spacing: 0.02em; }

@@ -14,24 +14,8 @@ import {
 import { liveFor, LiveIndex } from '../lib/live';
 import { useClock, useLiveScores } from '../lib/useLive';
 import { useOwners, OwnerIndex } from '../lib/owners';
-
-/** YYYY-MM-DD in UTC (so "today/tomorrow" is the same for every friend). */
-function utcYMD(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-/** Kick-off time in UTC, e.g. "19:00 UTC"; falls back to the raw string. */
-function utcTime(m: Match): string {
-  const k = kickoffMs(m);
-  if (k == null) return m.time;
-  const t = new Date(k).toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'UTC',
-    hour12: false,
-  });
-  return `${t} UTC`;
-}
+import { formatKickoff, useTimezone, ymdInZone } from '../lib/timezone';
+import { TimezonePicker } from './TimezonePicker';
 
 /** "Today & tomorrow" fixtures board so friends know when their team is on. */
 export function TodayMatches() {
@@ -40,6 +24,7 @@ export function TodayMatches() {
   const now = useClock(60_000);
   const liveIdx = useLiveScores();
   const owners = useOwners();
+  const [tz] = useTimezone();
 
   useEffect(() => {
     let alive = true;
@@ -57,46 +42,48 @@ export function TodayMatches() {
   }, []);
 
   const { today, tomorrow, todayLabel, tomorrowLabel } = useMemo(() => {
-    const d = new Date(now);
-    const todayStr = utcYMD(d);
-    const tmr = new Date(d.getTime() + 86_400_000);
-    const tomorrowStr = utcYMD(tmr);
+    const todayStr = ymdInZone(now, tz);
+    const tomorrowStr = ymdInZone(now + 86_400_000, tz);
     const fmt = (date: Date) =>
       date.toLocaleDateString('en-GB', {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
-        timeZone: 'UTC',
+        timeZone: tz,
       });
-    // Bucket by each match's UTC kick-off date, so a late game that rolls past
-    // midnight UTC lands on the right day (matching the UTC time we display).
-    const utcDateOf = (m: Match) => {
+    // Bucket by each match's kick-off date *in the viewer's zone*, so a late
+    // game lands on whatever calendar day it falls on for them (matching the
+    // local time we display next to it).
+    const dateOf = (m: Match) => {
       const k = kickoffMs(m);
-      return k == null ? m.date : utcYMD(new Date(k));
+      return k == null ? m.date : ymdInZone(k, tz);
     };
     const inDay = (ymd: string) =>
       (matches ?? [])
-        .filter((m) => utcDateOf(m) === ymd)
+        .filter((m) => dateOf(m) === ymd)
         .sort((a, b) => (kickoffMs(a) ?? 0) - (kickoffMs(b) ?? 0));
     return {
       today: inDay(todayStr),
       tomorrow: inDay(tomorrowStr),
-      todayLabel: fmt(d),
-      tomorrowLabel: fmt(tmr),
+      todayLabel: fmt(new Date(now)),
+      tomorrowLabel: fmt(new Date(now + 86_400_000)),
     };
-  }, [matches, now]);
+  }, [matches, now, tz]);
 
   if (!matches) return null;
   if (today.length === 0 && tomorrow.length === 0) return null;
 
   return (
     <section className="card today-card">
-      <h2>📅 Who plays next</h2>
+      <div className="today-head">
+        <h2>📅 Who plays next</h2>
+        <TimezonePicker />
+      </div>
       {today.length > 0 && (
-        <DayBlock title="Today" sub={todayLabel} matches={today} now={now} flags={flags} liveIdx={liveIdx} owners={owners} />
+        <DayBlock title="Today" sub={todayLabel} matches={today} now={now} flags={flags} liveIdx={liveIdx} owners={owners} tz={tz} />
       )}
       {tomorrow.length > 0 && (
-        <DayBlock title="Tomorrow" sub={tomorrowLabel} matches={tomorrow} now={now} flags={flags} liveIdx={liveIdx} owners={owners} />
+        <DayBlock title="Tomorrow" sub={tomorrowLabel} matches={tomorrow} now={now} flags={flags} liveIdx={liveIdx} owners={owners} tz={tz} />
       )}
     </section>
   );
@@ -110,6 +97,7 @@ function DayBlock({
   flags,
   liveIdx,
   owners,
+  tz,
 }: {
   title: string;
   sub: string;
@@ -118,6 +106,7 @@ function DayBlock({
   flags: Map<string, string>;
   liveIdx: LiveIndex;
   owners: OwnerIndex;
+  tz: string;
 }) {
   return (
     <div className="day-block">
@@ -127,7 +116,7 @@ function DayBlock({
       </div>
       <ul className="fixtures">
         {matches.map((m, i) => (
-          <Fixture key={i} m={m} now={now} flags={flags} liveIdx={liveIdx} owners={owners} />
+          <Fixture key={i} m={m} now={now} flags={flags} liveIdx={liveIdx} owners={owners} tz={tz} />
         ))}
       </ul>
     </div>
@@ -140,12 +129,14 @@ function Fixture({
   flags,
   liveIdx,
   owners,
+  tz,
 }: {
   m: Match;
   now: number;
   flags: Map<string, string>;
   liveIdx: LiveIndex;
   owners: OwnerIndex;
+  tz: string;
 }) {
   const info = liveFor(m, liveIdx);
   const isLive = (info?.phase ?? matchStatus(m, now)) === 'live';
@@ -180,7 +171,7 @@ function Fixture({
             <span className="live-dot" /> {info?.minute && /^\d+$/.test(info.minute) ? `${info.minute}'` : 'LIVE'}
           </span>
         ) : (
-          utcTime(m)
+          formatKickoff(kickoffMs(m), tz, m.time)
         )}
       </span>
       <span className="fx-match">

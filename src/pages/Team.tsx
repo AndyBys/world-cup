@@ -9,13 +9,16 @@ import {
   stageLabel,
   isPlayed,
   matchStatus,
+  kickoffMs,
   Match,
   Team as TeamInfo,
 } from '../lib/worldcup';
 import { liveFor, overlayFinished, LiveIndex, LivePhase } from '../lib/live';
 import { useClock, useLiveScores } from '../lib/useLive';
 import { useOwners } from '../lib/owners';
+import { formatKickoff, useTimezone } from '../lib/timezone';
 import { Standings } from '../components/Standings';
+import { TimezonePicker } from '../components/TimezonePicker';
 
 export function Team() {
   const { team: raw } = useParams();
@@ -28,6 +31,7 @@ export function Team() {
   const now = useClock();
   const liveIdx = useLiveScores();
   const owners = useOwners();
+  const [tz] = useTimezone();
 
   useEffect(() => {
     let alive = true;
@@ -108,6 +112,7 @@ export function Team() {
             ) : (
               <span className="chip alive">still in for the pot 🏆</span>
             ))}
+          <TimezonePicker />
         </div>
       </header>
 
@@ -121,7 +126,7 @@ export function Team() {
           </h2>
           <ul className="matches">
             {live.map((m, i) => (
-              <MatchRow key={i} m={m} team={team} now={now} idx={liveIdx} owners={owners} />
+              <MatchRow key={i} m={m} team={team} now={now} idx={liveIdx}  owners={owners} tz={tz} />
             ))}
           </ul>
         </section>
@@ -140,7 +145,7 @@ export function Team() {
           <h2>Results</h2>
           <ul className="matches">
             {results.map((m, i) => (
-              <MatchRow key={i} m={m} team={team} now={now} idx={liveIdx} owners={owners} />
+              <MatchRow key={i} m={m} team={team} now={now} idx={liveIdx}  owners={owners} tz={tz} />
             ))}
           </ul>
         </section>
@@ -151,7 +156,7 @@ export function Team() {
           <h2>Upcoming</h2>
           <ul className="matches">
             {upcoming.map((m, i) => (
-              <MatchRow key={i} m={m} team={team} now={now} idx={liveIdx} owners={owners} />
+              <MatchRow key={i} m={m} team={team} now={now} idx={liveIdx}  owners={owners} tz={tz} />
             ))}
           </ul>
         </section>
@@ -182,12 +187,14 @@ function MatchRow({
   now,
   idx,
   owners,
+  tz,
 }: {
   m: Match;
   team: string;
   now: number;
   idx: LiveIndex;
   owners: Map<string, string>;
+  tz: string;
 }) {
   const info = liveFor(m, idx);
   const isLive = (info?.phase ?? matchStatus(m, now)) === 'live';
@@ -222,9 +229,22 @@ function MatchRow({
         ) : outcome ? (
           <span className={`badge ${outcome}`}>{outcome}</span>
         ) : (
-          <>
-            {m.date} · {m.time}
-          </>
+          (() => {
+            const k = kickoffMs(m);
+            const day =
+              k == null
+                ? m.date
+                : new Date(k).toLocaleDateString('en-GB', {
+                    month: 'short',
+                    day: 'numeric',
+                    timeZone: tz,
+                  });
+            return (
+              <>
+                {day} · {formatKickoff(k, tz, m.time)}
+              </>
+            );
+          })()
         )}
       </span>
       <span className="match-ground muted">{m.ground}</span>
