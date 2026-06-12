@@ -45,7 +45,7 @@ export function TodayMatches() {
     const todayStr = ymdInZone(now, tz);
     const tomorrowStr = ymdInZone(now + 86_400_000, tz);
     const fmt = (date: Date) =>
-      date.toLocaleDateString('en-GB', {
+      date.toLocaleDateString('ru-RU', {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
@@ -76,14 +76,14 @@ export function TodayMatches() {
   return (
     <section className="card today-card">
       <div className="today-head">
-        <h2>📅 Who plays next</h2>
+        <h2>📅 Кто играет дальше</h2>
         <TimezonePicker />
       </div>
       {today.length > 0 && (
-        <DayBlock title="Today" sub={todayLabel} matches={today} now={now} flags={flags} liveIdx={liveIdx} owners={owners} tz={tz} />
+        <DayBlock title="Сегодня" sub={todayLabel} matches={today} now={now} flags={flags} liveIdx={liveIdx} owners={owners} tz={tz} />
       )}
       {tomorrow.length > 0 && (
-        <DayBlock title="Tomorrow" sub={tomorrowLabel} matches={tomorrow} now={now} flags={flags} liveIdx={liveIdx} owners={owners} tz={tz} />
+        <DayBlock title="Завтра" sub={tomorrowLabel} matches={tomorrow} now={now} flags={flags} liveIdx={liveIdx} owners={owners} tz={tz} />
       )}
     </section>
   );

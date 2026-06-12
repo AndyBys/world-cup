@@ -69,7 +69,7 @@ export function Lobby() {
   return (
     <div className="container">
       <header className="hero">
-        <h1>🏆 {TOURNAMENT_NAME} — Friends Lottery</h1>
+        <h1>🏆 {TOURNAMENT_NAME} — лотерея для своих</h1>
         <p className="tagline">
           Заходи в лотерею, получи случайную сборную в жеребьёвке и болей за неё до финала.
         </p>
@@ -81,12 +81,12 @@ export function Lobby() {
 
       <nav className="nav-row">
         <Link className="nav-btn" to="/tournament">
-          🌍 All groups &amp; knockout bracket
+          🌍 Все группы и сетка плей-офф
         </Link>
       </nav>
 
       {!state ? (
-        <p className="muted">Loading…</p>
+        <p className="muted">Загрузка…</p>
       ) : drawn ? (
         <Results
           state={state}
@@ -127,13 +127,13 @@ function PotBanner({ pot, drawn, count }: { pot: number; drawn: boolean; count: 
       <button
         className="pot-amount"
         onClick={() => setOpen((o) => !o)}
-        title="Tap to see other currencies"
+        title="Нажми, чтобы увидеть в других валютах"
       >
         💰 ${pot}
       </button>
       <span className="pot-label">
-        community pot — winner takes all
-        {!drawn && count > 0 && <em> (grows ${STAKE} per player)</em>}
+        <strong className="pot-buyin">${STAKE} с человека</strong> · общий банк, победитель забирает всё
+        {!drawn && count > 0 && <em> (+${STAKE} за каждого нового игрока)</em>}
       </span>
       {open && (
         <div className="pot-conversions">
@@ -154,10 +154,11 @@ function PoolTable({ flags }: { flags: Map<string, string> }) {
   const max = rows[0]?.prob ?? 1;
   return (
     <section className="card pool-card">
-      <h2>🎟️ The draw pool — top {rows.length} teams</h2>
+      <h2>🎟️ Пул жеребьёвки — топ-{rows.length} команд</h2>
       <p className="muted small">
-        Odds to win the World Cup. The draw deals out the strongest teams first —
-        one per player — so the more friends join, the further down the list it goes.
+        Шансы выиграть чемпионат мира. Жеребьёвка раздаёт сильнейших первыми —
+        по одной команде на человека, — так что чем больше друзей, тем дальше
+        вниз по списку доходит дело.
       </p>
       <ul className="pool-list">
         {rows.map((r) => (
@@ -224,14 +225,14 @@ function JoinForm({
       >
         <input
           type="text"
-          placeholder="Your name"
+          placeholder="Твоё имя"
           value={name}
           maxLength={40}
           onChange={(e) => setName(e.target.value)}
           disabled={busy}
         />
         <button type="submit" disabled={busy || !name.trim()}>
-          {busy ? 'Joining…' : cta}
+          {busy ? 'Заходим…' : cta}
         </button>
         {offerUltra && (
           <button
@@ -239,7 +240,7 @@ function JoinForm({
             className="ultra-btn"
             disabled={busy || !name.trim()}
             onClick={() => join('ultra')}
-            title="Forfeit your shot at a top team. Get a random underdog. No takebacks."
+            title="Откажись от шанса на топ-команду. Получи случайного аутсайдера. Назад дороги нет."
           >
             🎰 Ultra-gamble
           </button>
@@ -299,17 +300,37 @@ function Lobbying({
 }) {
   return (
     <section className="card">
-      <h2>The lobby is open</h2>
+      <h2>Лобби открыто</h2>
+
+      {!alreadyJoined && (
+        <ol className="how-it-works">
+          <li>
+            <span className="hiw-emoji">✍️</span>
+            <span className="hiw-text">
+              Впиши имя и заходи — взнос <strong>${STAKE}</strong> идёт в общий банк
+            </span>
+          </li>
+          <li>
+            <span className="hiw-emoji">🎲</span>
+            <span className="hiw-text">В день жеребьёвки тебе достаётся случайная сборная</span>
+          </li>
+          <li>
+            <span className="hiw-emoji">🏆</span>
+            <span className="hiw-text">Чья команда выиграет ЧМ — забирает весь банк</span>
+          </li>
+        </ol>
+      )}
+
       <p className="muted">
         {state.players.length === 0
-          ? 'Be the first to sign up!'
-          : `${state.players.length} signed up so far — waiting for the draw.`}
+          ? 'Будь первым — впиши имя ниже!'
+          : `Уже записалось: ${state.players.length}. Ждём жеребьёвку.`}
       </p>
 
       {!alreadyJoined ? (
-        <JoinForm onJoined={onJoined} cta="Join the lottery" />
+        <JoinForm onJoined={onJoined} cta="В лотерею!" />
       ) : (
-        <p className="joined-note">✅ You're in! Sit tight for the draw.</p>
+        <p className="joined-note">✅ Ты в игре! Жди жеребьёвку.</p>
       )}
 
       {state.players.length > 0 && (
@@ -317,7 +338,7 @@ function Lobbying({
           <thead>
             <tr>
               <th>#</th>
-              <th>Player</th>
+              <th>Игрок</th>
             </tr>
           </thead>
           <tbody>
@@ -328,9 +349,9 @@ function Lobbying({
                   <td className="muted">{i + 1}</td>
                   <td>
                     👤 {p.name}
-                    {p.id === myId && <span className="you-tag"> (you)</span>}
+                    {p.id === myId && <span className="you-tag"> (ты)</span>}
                     {ultraTeam && (
-                      <span className="ultra-badge" title="Ultra-gambled into a longshot">
+                      <span className="ultra-badge" title="Ультра-гэмбл на аутсайдера">
                         🎰 {flags.get(ultraTeam) ?? ''} {ultraTeam}
                       </span>
                     )}
@@ -364,13 +385,13 @@ function Results({
 
   return (
     <section className="card">
-      <h2>🎲 The draw is in!</h2>
+      <h2>🎲 Жеребьёвка состоялась!</h2>
       <table className="results">
         <thead>
           <tr>
-            <th>Friend</th>
-            <th>Team</th>
-            <th>Stake</th>
+            <th>Друг</th>
+            <th>Команда</th>
+            <th>Взнос</th>
           </tr>
         </thead>
         <tbody>
@@ -381,7 +402,7 @@ function Results({
                 {player.is_ultra && (
                   <span className="ultra-tag" title="Ultra-gambled">🎰</span>
                 )}
-                {player.id === myId && <span className="you-tag"> · you</span>}
+                {player.id === myId && <span className="you-tag"> · ты</span>}
               </td>
               <td>
                 {team ? (
@@ -395,12 +416,12 @@ function Results({
           ))}
         </tbody>
       </table>
-      <p className="muted small">Tap a team to see their group, fixtures and results.</p>
+      <p className="muted small">Нажми на команду — увидишь её группу, расписание и результаты.</p>
 
       {!alreadyJoined && (
         <div className="late-join">
-          <p>Late to the party? Join now and you'll be assigned one of the remaining teams.</p>
-          <JoinForm onJoined={onJoined} cta="Join late" offerUltra={false} />
+          <p>Опоздал? Заходи сейчас — получишь одну из оставшихся команд.</p>
+          <JoinForm onJoined={onJoined} cta="Зайти сейчас" offerUltra={false} />
         </div>
       )}
     </section>
@@ -431,22 +452,22 @@ function AdminStrip({ onDrew }: { onDrew: () => void }) {
     <section className="admin">
       {!open ? (
         <button className="link" onClick={() => setOpen(true)}>
-          organiser? run the draw
+          организатор? запустить жеребьёвку
         </button>
       ) : (
         <div className="admin-box">
           <input
             type="password"
-            placeholder="Admin passcode"
+            placeholder="Пароль организатора"
             value={passcode}
             onChange={(e) => setPasscode(e.target.value)}
             disabled={busy}
           />
           <button onClick={draw} disabled={busy || !passcode}>
-            {busy ? 'Drawing…' : '🎲 Run draw'}
+            {busy ? 'Разыгрываем…' : '🎲 Запустить'}
           </button>
           <button className="link" onClick={() => setOpen(false)}>
-            cancel
+            отмена
           </button>
           {error && <p className="error">{error}</p>}
         </div>
