@@ -30,6 +30,15 @@ import {
   PredictionRow,
 } from '../lib/predictions';
 
+/** Russian plural: plural(2,'прогноз','прогноза','прогнозов') → 'прогноза'. */
+function plural(n: number, one: string, few: string, many: string): string {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
+  return many;
+}
+
 /** Prediction game: guess the outcome of each match, public picks + leaderboard. */
 export function Predict() {
   const [matches, setMatches] = useState<Match[] | null>(null);
@@ -214,6 +223,8 @@ function IdentityBar({
 
 // --- Leaderboard ------------------------------------------------------------
 function Leaderboard({ board, meId }: { board: LeaderboardRow[]; meId?: string }) {
+  const anySettled = board.some((r) => r.settled > 0);
+
   return (
     <section className="card">
       <h2>🏅 Таблица прогнозистов</h2>
@@ -222,22 +233,39 @@ function Leaderboard({ board, meId }: { board: LeaderboardRow[]; meId?: string }
           Пока никто не сделал прогноз. Поставь на матчи ниже — и сюда подтянутся
           очки (по 1 за угаданный исход).
         </p>
+      ) : !anySettled ? (
+        // Nothing settled yet → reward participation, not raw pick count ordering.
+        <>
+          <ul className="pred-board participation">
+            {[...board]
+              .sort((a, b) => b.picks - a.picks || a.name.localeCompare(b.name))
+              .map((r) => (
+                <li key={r.player_id} className={`pb-row ${r.player_id === meId ? 'me' : ''}`}>
+                  <span className="pb-name">{r.name}</span>
+                  <span className="pb-num">
+                    {r.picks} {plural(r.picks, 'прогноз', 'прогноза', 'прогнозов')}
+                  </span>
+                </li>
+              ))}
+          </ul>
+          <p className="muted small">🏁 Очки появятся после первых сыгранных матчей.</p>
+        </>
       ) : (
-        <ul className="pred-board">
+        <ul className="pred-board results">
           <li className="pb-head">
             <span className="pb-rank">#</span>
             <span className="pb-name">Игрок</span>
             <span className="pb-num" title="Очки за угаданные исходы">Очки</span>
-            <span className="pb-num" title="Сыграно матчей из твоих прогнозов">Сыгр.</span>
-            <span className="pb-num" title="Всего сделано прогнозов">Всего</span>
+            <span className="pb-guessed" title="Угадано из сыгранных матчей">Угадано</span>
           </li>
           {board.map((r, i) => (
             <li key={r.player_id} className={`pb-row ${r.player_id === meId ? 'me' : ''}`}>
               <span className="pb-rank">{i + 1}</span>
               <span className="pb-name">{r.name}</span>
               <span className="pb-num pb-pts">{r.points}</span>
-              <span className="pb-num">{r.settled}</span>
-              <span className="pb-num">{r.picks}</span>
+              <span className="pb-guessed">
+                {r.settled > 0 ? `${r.points} из ${r.settled}` : '—'}
+              </span>
             </li>
           ))}
         </ul>
@@ -342,6 +370,12 @@ function PredictRow({
 
   const myPick = me ? picks.find((p) => p.player_id === me.id)?.pick : undefined;
   const tally = (p: Pick) => picks.filter((x) => x.pick === p);
+  const total = picks.length;
+  const maxVotes = Math.max(
+    tally('1').length,
+    tally('X').length,
+    tally('2').length,
+  );
 
   // Editable until kickoff: clicking another option just updates the pick.
   const choose = async (pick: Pick) => {
@@ -396,14 +430,19 @@ function PredictRow({
           const voters = tally(pick);
           const isWin = fixture.result === pick;
           const mine = myPick === pick;
+          const pct = total ? Math.round((voters.length / total) * 100) : 0;
+          // The crowd favourite glows brightest (only meaningful with votes and
+          // before the result is in).
+          const lead = total > 0 && !fixture.result && voters.length === maxVotes && maxVotes > 0;
           return (
             <button
               key={pick}
-              className={`pred-opt ${mine ? 'mine' : ''} ${isWin ? 'win' : ''}`}
+              className={`pred-opt ${mine ? 'mine' : ''} ${isWin ? 'win' : ''} ${lead ? 'lead' : ''}`}
               onClick={() => choose(pick)}
               disabled={!me || locked || busy}
               title={voters.map((v) => names.get(v.player_id) ?? '?').join(', ') || 'пока никто'}
             >
+              {!fixture.result && <span className="po-fill" style={{ width: `${pct}%` }} />}
               <span className="po-cap">{cap}</span>
               {team && (
                 <span className="po-team">
@@ -411,7 +450,7 @@ function PredictRow({
                   {team}
                 </span>
               )}
-              <span className="po-count">{voters.length}</span>
+              <span className="po-pct">{pct}%</span>
               {mine && <span className="po-mark">{isWin ? '✓' : fixture.result ? '✗' : '✓ твой'}</span>}
             </button>
           );
@@ -420,6 +459,7 @@ function PredictRow({
 
       {!me && <p className="muted small pred-hint">Войди именем и PIN выше, чтобы голосовать.</p>}
       {me && !locked && !myPick && <p className="muted small pred-hint">Выбери исход — можно менять до начала матча.</p>}
+      {total > 0 && <p className="muted small pred-voted">Проголосовали: {total}</p>}
       {err && <p className="error small">{err}</p>}
     </li>
   );

@@ -955,12 +955,13 @@ a.mside:hover .mside-name { color: var(--green); }
 .pred-board { list-style: none; margin: 0; padding: 0; }
 .pred-board li {
   display: grid;
-  grid-template-columns: 26px 1fr 48px 48px 48px;
   align-items: center;
   gap: 6px;
   padding: 8px 6px;
   border-bottom: 1px solid var(--border);
 }
+.pred-board.results li      { grid-template-columns: 26px 1fr 52px 92px; }
+.pred-board.participation li { grid-template-columns: 1fr auto; }
 .pred-board li:last-child { border-bottom: none; }
 .pred-board .pb-head {
   font-size: 0.72rem;
@@ -972,7 +973,10 @@ a.mside:hover .mside-name { color: var(--green); }
 .pred-board .pb-rank { color: var(--muted); font-variant-numeric: tabular-nums; }
 .pred-board .pb-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pred-board .pb-num { text-align: center; font-variant-numeric: tabular-nums; }
+.pred-board .pb-guessed { text-align: right; color: var(--muted); font-size: 0.86rem; font-variant-numeric: tabular-nums; }
+.pred-board .pb-head.pb-guessed, .pred-board .pb-head .pb-guessed { text-align: right; }
 .pred-board .pb-pts { font-weight: 800; color: #fff; }
+.pred-board.participation .pb-num { color: var(--muted); font-size: 0.86rem; }
 .pred-board .pb-row.me { background: var(--me); border-radius: 8px; }
 
 /* Match card — compact: meta line, teams, then three stretched choice buttons. */
@@ -1007,6 +1011,8 @@ a.mside:hover .mside-name { color: var(--green); }
 
 .pred-choices { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 .pred-opt {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1020,6 +1026,15 @@ a.mside:hover .mside-name { color: var(--green); }
   text-align: center;
   min-width: 0;
 }
+/* Crowd-vote fill bar behind the label; content sits above it. */
+.pred-opt > span { position: relative; z-index: 1; }
+.pred-opt .po-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  z-index: 0;
+  background: rgba(45, 212, 167, 0.16);
+  transition: width 0.3s ease;
+}
 .pred-opt .po-cap { font-size: 0.66rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .pred-opt .po-team {
   display: flex; align-items: center; gap: 4px; justify-content: center;
@@ -1027,12 +1042,16 @@ a.mside:hover .mside-name { color: var(--green); }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
 }
 .pred-opt .po-flag { flex: 0 0 auto; }
-.pred-opt .po-count { font-size: 0.66rem; font-weight: 600; color: var(--muted); }
+.pred-opt .po-pct { font-size: 0.8rem; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
 .pred-opt .po-mark { font-size: 0.66rem; font-weight: 800; color: var(--green); }
 .pred-opt.mine { border-color: var(--green); background: var(--me); color: #fff; }
-.pred-opt.mine .po-cap, .pred-opt.mine .po-count { color: var(--green); }
+.pred-opt.mine .po-cap { color: var(--green); }
+/* Crowd favourite — brightest fill + green ring. */
+.pred-opt.lead { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+.pred-opt.lead .po-fill { background: rgba(45, 212, 167, 0.30); }
 .pred-opt.win { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(245, 196, 81, 0.3); }
 .pred-opt.win.mine .po-mark { color: var(--gold); }
 .pred-opt:disabled { cursor: default; }
-.pred-opt:disabled:not(.mine):not(.win) { opacity: 0.6; }
+.pred-opt:disabled:not(.mine):not(.win):not(.lead) { opacity: 0.72; }
 .pred-hint { margin: 8px 0 0; }
+.pred-voted { margin: 6px 0 0; text-align: right; }
