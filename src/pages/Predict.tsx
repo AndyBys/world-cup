@@ -30,9 +30,7 @@ import {
   PredictionRow,
 } from '../lib/predictions';
 
-const PICKS: Pick[] = ['1', 'X', '2'];
-
-/** Prediction game: guess 1 / X / 2 for each match, public picks + leaderboard. */
+/** Prediction game: guess the outcome of each match, public picks + leaderboard. */
 export function Predict() {
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [flags, setFlags] = useState<Map<string, string>>(new Map());
@@ -97,7 +95,7 @@ export function Predict() {
 
   return (
     <div className="page">
-      <div className="container wide">
+      <div className="container">
         <header className="page-head">
           <Link className="back" to="/">← В лотерею</Link>
           <h1>🔮 Прогнозы матчей</h1>
@@ -225,28 +223,24 @@ function Leaderboard({ board, meId }: { board: LeaderboardRow[]; meId?: string }
           очки (по 1 за угаданный исход).
         </p>
       ) : (
-      <table className="standings">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th className="th-team">Игрок</th>
-            <th title="Очки (угаданные исходы)">Очки</th>
-            <th title="Матчей сыграно с твоим прогнозом">Сыграно</th>
-            <th title="Всего прогнозов">Всего</th>
-          </tr>
-        </thead>
-        <tbody>
+        <ul className="pred-board">
+          <li className="pb-head">
+            <span className="pb-rank">#</span>
+            <span className="pb-name">Игрок</span>
+            <span className="pb-num" title="Очки за угаданные исходы">Очки</span>
+            <span className="pb-num" title="Сыграно матчей из твоих прогнозов">Сыгр.</span>
+            <span className="pb-num" title="Всего сделано прогнозов">Всего</span>
+          </li>
           {board.map((r, i) => (
-            <tr key={r.player_id} className={r.player_id === meId ? 'me' : ''}>
-              <td>{i + 1}</td>
-              <td className="team-cell">{r.name}</td>
-              <td className="pts">{r.points}</td>
-              <td>{r.settled}</td>
-              <td>{r.picks}</td>
-            </tr>
+            <li key={r.player_id} className={`pb-row ${r.player_id === meId ? 'me' : ''}`}>
+              <span className="pb-rank">{i + 1}</span>
+              <span className="pb-name">{r.name}</span>
+              <span className="pb-num pb-pts">{r.points}</span>
+              <span className="pb-num">{r.settled}</span>
+              <span className="pb-num">{r.picks}</span>
+            </li>
           ))}
-        </tbody>
-      </table>
+        </ul>
       )}
     </section>
   );
@@ -348,14 +342,10 @@ function PredictRow({
 
   const myPick = me ? picks.find((p) => p.player_id === me.id)?.pick : undefined;
   const tally = (p: Pick) => picks.filter((x) => x.pick === p);
-  // A pick is final: once you've predicted this match you can't change it.
-  const picked = myPick !== undefined;
 
+  // Editable until kickoff: clicking another option just updates the pick.
   const choose = async (pick: Pick) => {
-    if (!me || locked || busy || picked) return;
-    if (!window.confirm(`Поставить «${pick}» на ${m.team1} – ${m.team2}? Изменить будет нельзя.`)) {
-      return;
-    }
+    if (!me || locked || busy || pick === myPick) return;
     setErr(null);
     setBusy(true);
     try {
@@ -375,49 +365,62 @@ function PredictRow({
     </span>
   );
 
-  return (
-    <li className={`fixture pred-fixture ${isLive ? 'live' : ''}`}>
-      <span className="fx-time">
-        {fixture.result ? 'FT' : isLive ? (
-          <span className="badge live"><span className="live-dot" /> LIVE</span>
-        ) : (
-          formatKickoff(kickoff, tz, m.time)
-        )}
-      </span>
-      <span className="fx-match">
-        {side(m.team1)}
-        <span className="fx-score">{ft ? `${ft[0]}–${ft[1]}` : 'v'}</span>
-        {side(m.team2)}
-      </span>
-      <span className="fx-meta">
-        <span className="fx-stage">{stageLabel(m)}</span>
-      </span>
+  // Three stretched choices: win team1 · draw · win team2.
+  const options: { pick: Pick; cap: string; team?: string }[] = [
+    { pick: '1', cap: 'Победа', team: m.team1 },
+    { pick: 'X', cap: 'Ничья' },
+    { pick: '2', cap: 'Победа', team: m.team2 },
+  ];
 
-      <div className="pred-controls">
-        {PICKS.map((p) => {
-          const voters = tally(p);
-          const isWin = fixture.result === p;
-          const mine = myPick === p;
+  return (
+    <li className={`pred-card ${isLive ? 'live' : ''} ${locked ? 'locked' : ''}`}>
+      <div className="pred-top">
+        <span className="pred-when">
+          {fixture.result ? 'Завершён' : isLive ? (
+            <span className="badge live"><span className="live-dot" /> LIVE</span>
+          ) : (
+            formatKickoff(kickoff, tz, m.time)
+          )}
+        </span>
+        <span className="pred-stage">{stageLabel(m)}</span>
+      </div>
+
+      <div className="pred-teams">
+        {side(m.team1)}
+        <span className="fx-score">{ft ? `${ft[0]}–${ft[1]}` : ':'}</span>
+        {side(m.team2)}
+      </div>
+
+      <div className="pred-choices">
+        {options.map(({ pick, cap, team }) => {
+          const voters = tally(pick);
+          const isWin = fixture.result === pick;
+          const mine = myPick === pick;
           return (
             <button
-              key={p}
-              className={`pred-btn ${mine ? 'mine' : ''} ${isWin ? 'win' : ''}`}
-              onClick={() => choose(p)}
-              disabled={!me || locked || busy || picked}
-              title={voters.map((v) => names.get(v.player_id) ?? '?').join(', ')}
+              key={pick}
+              className={`pred-opt ${mine ? 'mine' : ''} ${isWin ? 'win' : ''}`}
+              onClick={() => choose(pick)}
+              disabled={!me || locked || busy}
+              title={voters.map((v) => names.get(v.player_id) ?? '?').join(', ') || 'пока никто'}
             >
-              <span className="pred-label">{p}</span>
-              <span className="pred-count">{voters.length}</span>
+              <span className="po-cap">{cap}</span>
+              {team && (
+                <span className="po-team">
+                  <span className="po-flag">{flags.get(team) ?? '⚽'}</span>
+                  {team}
+                </span>
+              )}
+              <span className="po-count">{voters.length}</span>
+              {mine && <span className="po-mark">{isWin ? '✓' : fixture.result ? '✗' : '✓ твой'}</span>}
             </button>
           );
         })}
-        {myPick && (
-          <span className={`pred-mine-tag ${fixture.result ? (myPick === fixture.result ? 'ok' : 'no') : ''}`}>
-            твой: {myPick}{fixture.result ? (myPick === fixture.result ? ' ✓' : ' ✗') : ''}
-          </span>
-        )}
       </div>
-      {err && <span className="error small">{err}</span>}
+
+      {!me && <p className="muted small pred-hint">Войди именем и PIN выше, чтобы голосовать.</p>}
+      {me && !locked && !myPick && <p className="muted small pred-hint">Выбери исход — можно менять до начала матча.</p>}
+      {err && <p className="error small">{err}</p>}
     </li>
   );
 }

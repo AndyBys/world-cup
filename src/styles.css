@@ -950,33 +950,89 @@ a.mside:hover .mside-name { color: var(--green); }
 /* ---- Predictions ---- */
 .pred-id { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .pred-login .signup { margin-top: 10px; }
-.pred-fixture { flex-wrap: wrap; }
-.pred-controls {
+
+/* Leaderboard — a tidy fixed-grid list so the number columns are always legible. */
+.pred-board { list-style: none; margin: 0; padding: 0; }
+.pred-board li {
+  display: grid;
+  grid-template-columns: 26px 1fr 48px 48px 48px;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.pred-board li:last-child { border-bottom: none; }
+.pred-board .pb-head {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.pred-board .pb-rank { color: var(--muted); font-variant-numeric: tabular-nums; }
+.pred-board .pb-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pred-board .pb-num { text-align: center; font-variant-numeric: tabular-nums; }
+.pred-board .pb-pts { font-weight: 800; color: #fff; }
+.pred-board .pb-row.me { background: var(--me); border-radius: 8px; }
+
+/* Match card — compact: meta line, teams, then three stretched choice buttons. */
+.pred-card {
+  list-style: none;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  margin-bottom: 10px;
+}
+.pred-card.live { box-shadow: inset 3px 0 0 #ff4d4d; }
+.pred-card.locked { opacity: 0.92; }
+.pred-top {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  width: 100%;
-  margin-top: 6px;
+  justify-content: space-between;
+  font-size: 0.74rem;
+  color: var(--muted);
+  margin-bottom: 8px;
 }
-.pred-btn {
-  display: inline-flex;
+.pred-when { font-weight: 700; }
+.pred-teams {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+.pred-teams .fx-score { font-weight: 800; color: #fff; }
+
+.pred-choices { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.pred-opt {
+  display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 52px;
-  padding: 6px 12px;
-  border-radius: 12px;
+  gap: 2px;
+  padding: 8px 6px;
+  border-radius: 10px;
   background: var(--surface-2);
   border: 1px solid var(--border-2);
   color: var(--text);
   font-weight: 700;
-  line-height: 1.1;
+  text-align: center;
+  min-width: 0;
 }
-.pred-btn .pred-count { font-size: 0.68rem; font-weight: 600; color: var(--muted); }
-.pred-btn.mine { border-color: var(--green); background: var(--me); color: #fff; }
-.pred-btn.mine .pred-count { color: var(--green); }
-.pred-btn.win { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(245, 196, 81, 0.25); }
-.pred-btn:disabled { opacity: 0.55; }
-.pred-mine-tag { font-size: 0.78rem; font-weight: 700; color: var(--muted); margin-left: auto; }
-.pred-mine-tag.ok { color: var(--green); }
-.pred-mine-tag.no { color: #ff7a72; }
+.pred-opt .po-cap { font-size: 0.66rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.pred-opt .po-team {
+  display: flex; align-items: center; gap: 4px; justify-content: center;
+  font-size: 0.86rem; line-height: 1.1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+}
+.pred-opt .po-flag { flex: 0 0 auto; }
+.pred-opt .po-count { font-size: 0.66rem; font-weight: 600; color: var(--muted); }
+.pred-opt .po-mark { font-size: 0.66rem; font-weight: 800; color: var(--green); }
+.pred-opt.mine { border-color: var(--green); background: var(--me); color: #fff; }
+.pred-opt.mine .po-cap, .pred-opt.mine .po-count { color: var(--green); }
+.pred-opt.win { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(245, 196, 81, 0.3); }
+.pred-opt.win.mine .po-mark { color: var(--gold); }
+.pred-opt:disabled { cursor: default; }
+.pred-opt:disabled:not(.mine):not(.win) { opacity: 0.6; }
+.pred-hint { margin: 8px 0 0; }
