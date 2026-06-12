@@ -19,13 +19,18 @@ interface GameState {
 
 async function loadState(): Promise<GameState> {
   const [{ data: players }, { data: assignments }, { data: drawn }] = await Promise.all([
-    supabase.from('players').select('id,name,created_at,is_ultra').order('created_at'),
+    supabase.from('players').select('id,name,created_at,is_ultra,predicts_only').order('created_at'),
     supabase.from('assignments').select('player_id,team'),
     supabase.rpc('is_drawn'),
   ]);
   const map = new Map<string, string>();
   for (const a of assignments ?? []) map.set(a.player_id, a.team);
-  return { players: (players as Player[]) ?? [], assignments: map, drawn: !!drawn };
+  // Predict-only sign-ups (joined via /predict, no lottery team) must not show up
+  // in the lottery roster/results — they'd appear teamless. Keep only real entrants.
+  const roster = ((players as (Player & { predicts_only?: boolean })[]) ?? []).filter(
+    (p) => !p.predicts_only,
+  );
+  return { players: roster, assignments: map, drawn: !!drawn };
 }
 
 export function Lobby() {
