@@ -76,22 +76,24 @@ export function Predict() {
     };
   }, []);
 
-  // Only matches the server knows about (have a fixture row → a kickoff lock),
-  // grouped by kickoff day in the viewer's zone, chronological.
+  // Like the home board: only today & tomorrow (in the viewer's zone), and only
+  // matches the server knows about (a fixture row = a kickoff lock).
   const days = useMemo(() => {
-    const playable = (matches ?? [])
-      .filter((m) => fixtures.has(matchKey(m)))
-      .sort((a, b) => (kickoffMs(a) ?? 0) - (kickoffMs(b) ?? 0));
-    const byDay = new Map<string, Match[]>();
-    for (const m of playable) {
+    const todayStr = ymdInZone(now, tz);
+    const tomorrowStr = ymdInZone(now + 86_400_000, tz);
+    const dayOf = (m: Match) => {
       const k = kickoffMs(m);
-      const ymd = k == null ? m.date : ymdInZone(k, tz);
-      const arr = byDay.get(ymd) ?? [];
-      arr.push(m);
-      byDay.set(ymd, arr);
-    }
-    return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [matches, fixtures, tz]);
+      return k == null ? m.date : ymdInZone(k, tz);
+    };
+    const inDay = (ymd: string) =>
+      (matches ?? [])
+        .filter((m) => fixtures.has(matchKey(m)) && dayOf(m) === ymd)
+        .sort((a, b) => (kickoffMs(a) ?? 0) - (kickoffMs(b) ?? 0));
+    return [
+      ['Сегодня', todayStr, inDay(todayStr)] as const,
+      ['Завтра', tomorrowStr, inDay(tomorrowStr)] as const,
+    ].filter(([, , ms]) => ms.length > 0);
+  }, [matches, fixtures, now, tz]);
 
   return (
     <div className="page">
@@ -119,12 +121,14 @@ export function Predict() {
             <p className="muted">Загрузка…</p>
           ) : days.length === 0 ? (
             <p className="muted small">
-              Матчи появятся, как только организатор синхронизирует расписание.
+              Сегодня и завтра матчей нет. Загляни позже — прогнозы открываются по
+              мере приближения игр.
             </p>
           ) : (
-            days.map(([ymd, ms]) => (
+            days.map(([title, ymd, ms]) => (
               <DayBlock
                 key={ymd}
+                title={title}
                 ymd={ymd}
                 matches={ms}
                 fixtures={fixtures}
@@ -250,6 +254,7 @@ function Leaderboard({ board, meId }: { board: LeaderboardRow[]; meId?: string }
 
 // --- A day's matches --------------------------------------------------------
 function DayBlock({
+  title,
   ymd,
   matches,
   fixtures,
@@ -262,6 +267,7 @@ function DayBlock({
   me,
   onPicked,
 }: {
+  title: string;
   ymd: string;
   matches: Match[];
   fixtures: Map<string, Fixture>;
@@ -283,7 +289,8 @@ function DayBlock({
   return (
     <div className="day-block">
       <div className="day-head">
-        <span className="day-title">{label}</span>
+        <span className="day-title">{title}</span>
+        <span className="day-sub">{label}</span>
       </div>
       <ul className="fixtures">
         {matches.map((m) => (
@@ -341,9 +348,14 @@ function PredictRow({
 
   const myPick = me ? picks.find((p) => p.player_id === me.id)?.pick : undefined;
   const tally = (p: Pick) => picks.filter((x) => x.pick === p);
+  // A pick is final: once you've predicted this match you can't change it.
+  const picked = myPick !== undefined;
 
   const choose = async (pick: Pick) => {
-    if (!me || locked || busy) return;
+    if (!me || locked || busy || picked) return;
+    if (!window.confirm(`Поставить «${pick}» на ${m.team1} – ${m.team2}? Изменить будет нельзя.`)) {
+      return;
+    }
     setErr(null);
     setBusy(true);
     try {
@@ -391,7 +403,7 @@ function PredictRow({
               key={p}
               className={`pred-btn ${mine ? 'mine' : ''} ${isWin ? 'win' : ''}`}
               onClick={() => choose(p)}
-              disabled={!me || locked || busy}
+              disabled={!me || locked || busy || picked}
               title={voters.map((v) => names.get(v.player_id) ?? '?').join(', ')}
             >
               <span className="pred-label">{p}</span>

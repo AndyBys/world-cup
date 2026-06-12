@@ -140,6 +140,7 @@ export function predictionError(message: string): string {
     NO_PIN: 'Для этого имени ещё не задан PIN.',
     NO_MATCH: 'Матч не найден.',
     LOCKED: '⏱️ Матч уже начался — ставки закрыты.',
+    ALREADY_PICKED: 'Прогноз на этот матч уже сделан — менять нельзя.',
     BAD_PICK: 'Выбери 1, X или 2.',
   };
   for (const code of Object.keys(map)) if (message.includes(code)) return map[code];

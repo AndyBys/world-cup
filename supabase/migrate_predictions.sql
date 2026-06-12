@@ -161,10 +161,15 @@ begin
     raise exception 'LOCKED' using hint = 'This match has kicked off — picks are closed.';
   end if;
 
+  -- One-shot: a pick is FINAL. No update/delete path, so nobody can wait to see
+  -- how a match develops (or copy the crowd late) and revise. First pick sticks.
   insert into predictions (player_id, match_key, pick)
   values (v_id, p_match_key, p_pick)
-  on conflict (player_id, match_key)
-  do update set pick = excluded.pick, updated_at = now();
+  on conflict (player_id, match_key) do nothing;
+  if not found then
+    raise exception 'ALREADY_PICKED'
+      using hint = 'You already predicted this match — picks are final.';
+  end if;
 end;
 $$;
 
