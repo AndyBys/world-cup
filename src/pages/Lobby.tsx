@@ -62,6 +62,9 @@ export function Lobby() {
   const pot = playerCount * STAKE;
   const me = state?.players.find((p) => p.id === myId);
   const alreadyJoined = !!me;
+  // The normal draw deals top-N pool teams to the N non-ultra players (ultra
+  // players take underdogs instead), so that's how many teams are "in play".
+  const inPlay = state?.players.filter((p) => !p.is_ultra).length ?? 0;
   // The current user's locked-in underdog, shown the moment they ultra-gamble
   // (before the main draw) and forever after.
   const myUltraTeam = me?.is_ultra ? state?.assignments.get(me.id) ?? null : null;
@@ -107,7 +110,7 @@ export function Lobby() {
 
       <TodayMatches />
 
-      <PoolTable flags={flags} />
+      <PoolTable flags={flags} inPlay={inPlay} />
 
       {!drawn && <AdminStrip onDrew={() => loadState().then(setState).catch(() => {})} />}
     </div>
@@ -148,34 +151,59 @@ function PotBanner({ pot, drawn, count }: { pot: number; drawn: boolean; count: 
   );
 }
 
-/** The teams up for grabs in the draw, with each team's win probability. */
-function PoolTable({ flags }: { flags: Map<string, string> }) {
-  const rows = poolByOdds();
-  const max = rows[0]?.prob ?? 1;
+/**
+ * The teams actually in the draw right now: the top-N pool teams, where N =
+ * how many (non-ultra) friends have registered. As more join, more teams enter
+ * — so the list grows with the lobby. Percentages are the current bookmaker
+ * odds to win the World Cup.
+ */
+function PoolTable({ flags, inPlay }: { flags: Map<string, string>; inPlay: number }) {
+  const all = poolByOdds();
+  const n = Math.min(inPlay, all.length);
+  const rows = all.slice(0, n);
+  const max = all[0]?.prob ?? 1; // scale bars against the strongest team overall
+
   return (
     <section className="card pool-card">
-      <h2>🎟️ Пул жеребьёвки — топ-{rows.length} команд</h2>
+      <h2>🎟️ В розыгрыше сейчас — {n} {plural(n, 'команда', 'команды', 'команд')}</h2>
       <p className="muted small">
-        Шансы выиграть чемпионат мира. Жеребьёвка раздаёт сильнейших первыми —
-        по одной команде на человека, — так что чем больше друзей, тем дальше
-        вниз по списку доходит дело.
+        Случайно раздаём именно из этих команд — по одной на человека. Сейчас
+        зарегано {inPlay}, поэтому в игре топ-{n}. Зайдёт больше друзей —
+        добавятся следующие по силе. Проценты — текущие шансы букмекеров выиграть
+        ЧМ.
       </p>
-      <ul className="pool-list">
-        {rows.map((r) => (
-          <li key={r.team} className="pool-row">
-            <Link className="pool-team" to={`/team/${encodeURIComponent(r.team)}`}>
-              <span className="pool-flag">{flags.get(r.team) ?? '⚽'}</span>
-              <span className="pool-name">{r.team}</span>
-            </Link>
-            <span className="pool-bar-wrap">
-              <span className="pool-bar" style={{ width: `${(r.prob / max) * 100}%` }} />
-            </span>
-            <span className="pool-prob">{Math.round(r.prob)}%</span>
-          </li>
-        ))}
-      </ul>
+      {n === 0 ? (
+        <p className="muted small pool-empty">
+          Пока никто не зашёл. Добавляйся — и первой в розыгрыш войдёт{' '}
+          {all[0]?.team}.
+        </p>
+      ) : (
+        <ul className="pool-list">
+          {rows.map((r) => (
+            <li key={r.team} className="pool-row">
+              <Link className="pool-team" to={`/team/${encodeURIComponent(r.team)}`}>
+                <span className="pool-flag">{flags.get(r.team) ?? '⚽'}</span>
+                <span className="pool-name">{r.team}</span>
+              </Link>
+              <span className="pool-bar-wrap">
+                <span className="pool-bar" style={{ width: `${(r.prob / max) * 100}%` }} />
+              </span>
+              <span className="pool-prob">{Math.round(r.prob)}%</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
+}
+
+/** Russian plural picker: plural(n, "команда", "команды", "команд"). */
+function plural(n: number, one: string, few: string, many: string): string {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
+  return many;
 }
 
 /**
