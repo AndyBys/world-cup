@@ -5,7 +5,7 @@ import { STAKE, TOURNAMENT_NAME } from '../lib/config';
 import { getTeams, Team } from '../lib/worldcup';
 import { CURRENCIES, convert, getRates } from '../lib/currency';
 import { poolByOdds } from '../lib/pool';
-import { ULTRA_POOL, ultraInfo } from '../lib/ultra';
+import { ULTRA_TEAMS } from '../lib/ultra';
 import { TeamPill } from '../components/TeamPill';
 import { TodayMatches } from '../components/TodayMatches';
 
@@ -70,7 +70,9 @@ export function Lobby() {
     <div className="container">
       <header className="hero">
         <h1>🏆 {TOURNAMENT_NAME} — Friends Lottery</h1>
-        <p className="tagline">Sign up, get drawn a national team, follow them to glory.</p>
+        <p className="tagline">
+          Заходи в лотерею, получи случайную сборную в жеребьёвке и болей за неё до финала.
+        </p>
       </header>
 
       <PotBanner pot={pot} drawn={drawn} count={playerCount} />
@@ -106,8 +108,6 @@ export function Lobby() {
       <TodayMatches />
 
       <PoolTable flags={flags} />
-
-      <UltraPool flags={flags} />
 
       {!drawn && <AdminStrip onDrew={() => loadState().then(setState).catch(() => {})} />}
     </div>
@@ -211,6 +211,8 @@ function JoinForm({
     onJoined(data as string);
   }
 
+  const [showInfo, setShowInfo] = useState(false);
+
   return (
     <>
       <form
@@ -231,18 +233,37 @@ function JoinForm({
         <button type="submit" disabled={busy || !name.trim()}>
           {busy ? 'Joining…' : cta}
         </button>
+        {offerUltra && (
+          <button
+            type="button"
+            className="ultra-btn"
+            disabled={busy || !name.trim()}
+            onClick={() => join('ultra')}
+            title="Forfeit your shot at a top team. Get a random underdog. No takebacks."
+          >
+            🎰 Ultra-gamble
+          </button>
+        )}
       </form>
       {offerUltra && (
-        <button
-          type="button"
-          className="ultra-btn"
-          disabled={busy || !name.trim()}
-          onClick={() => join('ultra')}
-          title="Forfeit your shot at a top team. Get a random underdog. No takebacks."
-        >
-          🎰 ULTRA-GAMBLE 🎲
-          <span className="ultra-btn-sub">skip the draw · roll for a longshot · 💸</span>
-        </button>
+        <>
+          <button
+            type="button"
+            className="link ultra-info-link"
+            onClick={() => setShowInfo((s) => !s)}
+          >
+            🎰 что такое Ultra-gamble?
+          </button>
+          {showInfo && (
+            <p className="ultra-hint muted small">
+              Вместо обычной жеребьёвки (где можно вытащить фаворита вроде Испании
+              или Франции) ты <strong>сразу</strong> получаешь одного случайного{' '}
+              <strong>аутсайдера</strong> — шанс на сенсацию крошечный, но если
+              выстрелит… Одна команда на человека, <strong>назад дороги нет</strong>.
+              Можешь получить: {ULTRA_TEAMS.join(' · ')}.
+            </p>
+          )}
+        </>
       )}
       {error && <p className="error">{error}</p>}
     </>
@@ -251,47 +272,15 @@ function JoinForm({
 
 /** The dramatic "your fate is sealed" banner for a player who ultra-gambled. */
 function UltraReveal({ team, flags }: { team: string; flags: Map<string, string> }) {
-  const info = ultraInfo(team);
   return (
     <div className="ultra-reveal">
-      <span className="ultra-reveal-top">🎰 The dice are loaded… your fate is sealed</span>
+      <span className="ultra-reveal-top">🎰 Кости брошены… твоя судьба решена</span>
       <Link className="ultra-reveal-team" to={`/team/${encodeURIComponent(team)}`}>
         <span className="ultra-reveal-flag">{flags.get(team) ?? '⚽'}</span>
         <span className="ultra-reveal-name">{team}</span>
-        {info && <span className="ultra-reveal-odds">{info.odds}</span>}
       </Link>
-      <span className="ultra-reveal-sub">
-        {info
-          ? `win $${info.payout} on a $10 bet · no takebacks`
-          : 'no takebacks'}
-      </span>
+      <span className="ultra-reveal-sub">назад дороги нет 🎲</span>
     </div>
-  );
-}
-
-/** "For the degenerates" — the ultra-gamble underdog pool with its big odds. */
-function UltraPool({ flags }: { flags: Map<string, string> }) {
-  return (
-    <section className="card ultra-card">
-      <h2>🎰 Ultra-gamble pool — for the degenerates</h2>
-      <p className="muted small">
-        Skip the draw and roll for one of these {ULTRA_POOL.length} underdogs.
-        Tiny odds, juicy payouts, zero regrets. One per gambler — first come,
-        first served.
-      </p>
-      <ul className="ultra-list">
-        {ULTRA_POOL.map((u) => (
-          <li key={u.team} className="ultra-row">
-            <Link className="ultra-team" to={`/team/${encodeURIComponent(u.team)}`}>
-              <span className="ultra-flag">{flags.get(u.team) ?? '⚽'}</span>
-              <span className="ultra-name">{u.team}</span>
-            </Link>
-            <span className="ultra-odds">{u.odds}</span>
-            <span className="ultra-payout">$10 → ${u.payout}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }
 

@@ -574,37 +574,21 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--green); }
    =========================================================================== */
 :root { --red: #ff3b5c; --red-deep: #c81e3c; }
 
-/* The screaming red sign-up button. */
+/* The red sign-up button — same shape as "Join the lottery", just louder.
+   (Inherits padding/radius/size from the base button rule.) */
 .ultra-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  width: 100%;
-  margin: 2px 0 6px;
-  padding: 11px 16px;
-  border: 1px solid var(--red);
-  border-radius: 12px;
-  background: linear-gradient(95deg, var(--red-deep), var(--red));
+  background: linear-gradient(180deg, var(--red), var(--red-deep));
   color: #fff;
-  font-weight: 900;
-  font-size: 1rem;
-  letter-spacing: 0.06em;
-  cursor: pointer;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  font-weight: 800;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   box-shadow: 0 0 0 rgba(255, 59, 92, 0.7);
   animation: ultra-pulse 1.6s ease-in-out infinite;
 }
-.ultra-btn:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
-.ultra-btn:active:not(:disabled) { transform: translateY(1px) scale(0.99); }
-.ultra-btn:disabled { opacity: 0.5; animation: none; cursor: not-allowed; }
-.ultra-btn-sub {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  opacity: 0.9;
-  text-transform: uppercase;
-}
+.ultra-btn:disabled { opacity: 0.55; }
+.ultra-info-link { color: var(--red); margin-top: 2px; }
+.ultra-info-link:hover { color: var(--red); filter: brightness(1.2); }
+.ultra-hint { margin: 6px 0 10px; line-height: 1.5; }
+.ultra-hint strong { color: var(--red); }
 @keyframes ultra-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(255, 59, 92, 0.55); }
   50%      { box-shadow: 0 0 22px 4px rgba(255, 59, 92, 0.55); }
@@ -634,15 +618,6 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 }
 .ultra-reveal-flag { font-size: 1.8rem; }
 .ultra-reveal-name { font-size: 1.5rem; font-weight: 900; }
-.ultra-reveal-odds {
-  padding: 2px 9px;
-  border-radius: 999px;
-  background: var(--red-deep);
-  color: #fff;
-  font-weight: 800;
-  font-size: 0.95rem;
-  font-variant-numeric: tabular-nums;
-}
 .ultra-reveal-sub { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 
 /* Roster / results badges marking ultra players. */
@@ -661,31 +636,6 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--green); }
   border: 1px solid rgba(255, 59, 92, 0.4);
 }
 .ultra-tag { margin-left: 6px; }
-
-/* The underdog odds card. */
-.ultra-card { border-color: rgba(255, 59, 92, 0.3); }
-.ultra-card h2 { margin-bottom: 2px; color: var(--red); }
-.ultra-list { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.ultra-row {
-  display: grid;
-  grid-template-columns: minmax(140px, 1fr) 72px minmax(80px, auto);
-  align-items: center;
-  gap: 12px;
-  padding: 7px 8px;
-  border-radius: 10px;
-}
-.ultra-row:hover { background: rgba(255, 59, 92, 0.06); }
-.ultra-team { display: flex; align-items: center; gap: 9px; text-decoration: none; color: var(--text); min-width: 0; }
-.ultra-team:hover .ultra-name { color: var(--red); }
-.ultra-flag { font-size: 1.15rem; flex: 0 0 auto; }
-.ultra-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ultra-odds {
-  text-align: center;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-  color: var(--red);
-}
-.ultra-payout { text-align: right; color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 
 /* ===========================================================================
    Friends' teams — ownership tags & friend-vs-friend "clash" highlighting
