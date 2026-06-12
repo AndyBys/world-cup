@@ -1,0 +1,32 @@
+name: Sync fixtures
+
+# Pings the sync-fixtures Edge Function on a schedule so kickoff times and final
+# results stay current (the prediction game's fixtures table). The function is
+# deployed with --no-verify-jwt, so a plain GET works — no secrets needed.
+#
+# Note: GitHub's smallest cron granularity is 5 minutes, and scheduled runs can
+# be delayed a few minutes under load. That's fine here — fixtures only need to
+# refresh within a few minutes of a kickoff/result.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+# Don't pile up runs if one is slow / GitHub batches several ticks.
+concurrency:
+  group: sync-fixtures
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call sync-fixtures
+        run: |
+          echo "Calling sync-fixtures…"
+          body=$(curl -sS -w "\n%{http_code}" \
+            https://lmjanuwzvihbffhayxws.supabase.co/functions/v1/sync-fixtures)
+          code=$(echo "$body" | tail -n1)
+          echo "$body" | sed '$d'
+          echo "HTTP $code"
+          test "$code" = "200"
