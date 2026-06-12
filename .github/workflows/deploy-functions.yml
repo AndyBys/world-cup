@@ -1,8 +1,8 @@
 name: Deploy Supabase Functions
 
-# Deploys the live-scores Edge Function to Supabase. Runs when the function
-# changes (or manually). Separate from the Pages deploy so a docs/UI change
-# doesn't redeploy the function and vice-versa.
+# Deploys the Edge Functions to Supabase. Runs when a function changes (or
+# manually). Separate from the Pages deploy so a docs/UI change doesn't redeploy
+# the functions and vice-versa.
 on:
   push:
     branches: [main]
@@ -27,3 +27,8 @@ jobs:
           version: latest
       - name: Deploy live-scores function
         run: supabase functions deploy live-scores --no-verify-jwt --project-ref "$PROJECT_REF"
+      # sync-fixtures mirrors the schedule + results into the `fixtures` table
+      # (the kickoff lock for predictions). It uses the auto-injected
+      # SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY at runtime — no extra secrets.
+      - name: Deploy sync-fixtures function
+        run: supabase functions deploy sync-fixtures --no-verify-jwt --project-ref "$PROJECT_REF"

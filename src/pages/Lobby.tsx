@@ -86,6 +86,9 @@ export function Lobby() {
         <Link className="nav-btn" to="/tournament">
           🌍 Все группы и сетка плей-офф
         </Link>
+        <Link className="nav-btn" to="/predict">
+          🔮 Прогнозы матчей
+        </Link>
       </nav>
 
       {!state ? (
