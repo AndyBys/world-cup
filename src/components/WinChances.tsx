@@ -28,20 +28,29 @@ export function WinChances({
   const f2 = flags?.get(team2) ?? '';
   const label = `Шансы по букмекерам: ${team1} ${pct(p1)}%, ничья ${pct(px)}%, ${team2} ${pct(p2)}%`;
 
+  // The draw label sits centred over the grey segment (which starts at p1 and is
+  // px wide). Team labels are pinned to the bar's ends on a separate row, so they
+  // can never collide with the draw label even on very lopsided matches.
+  const drawCenter = (p1 + px / 2) * 100;
+
   return (
     <div className={`win-chances ${className ?? ''}`} title={label}>
+      <div className="wc-drawrow">
+        <span className="wc-draw" style={{ left: `${drawCenter}%` }}>
+          ничья {pct(px)}%
+        </span>
+      </div>
       <div className="wc-bar" role="img" aria-label={label}>
         <span className="wc-seg wc-1" style={{ width: `${p1 * 100}%` }} />
         <span className="wc-seg wc-x" style={{ width: `${px * 100}%` }} />
         <span className="wc-seg wc-2" style={{ width: `${p2 * 100}%` }} />
       </div>
-      <div className="wc-legend">
+      <div className="wc-ends">
         <span className="wc-end">
           <span className="wc-swatch wc-1" />
           {f1} {pct(p1)}%
         </span>
-        <span className="wc-mid">ничья {pct(px)}%</span>
-        <span className="wc-end wc-right">
+        <span className="wc-end">
           {pct(p2)}% {f2}
           <span className="wc-swatch wc-2" />
         </span>

@@ -471,17 +471,25 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 .wc-seg.wc-1 { background: var(--green-deep); }
 .wc-seg.wc-x { background: #5d6880; }
 .wc-seg.wc-2 { background: var(--gold-deep); }
-.wc-legend {
+/* "ничья" label on its own row above the bar, centred over the grey segment. */
+.wc-drawrow { position: relative; height: 14px; }
+.wc-draw {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+/* Team percentages pinned to the bar's two ends, on their own row below it. */
+.wc-ends {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
   font-size: 0.72rem;
-  color: var(--muted);
 }
-.wc-end { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; color: #cdd5e4; }
-.wc-end.wc-right { justify-content: flex-end; }
-.wc-mid { color: var(--muted); }
+.wc-end { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; color: #cdd5e4; font-weight: 700; }
 .wc-swatch { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
 .wc-swatch.wc-1 { background: var(--green-deep); }
 .wc-swatch.wc-2 { background: var(--gold-deep); }
