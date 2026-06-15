@@ -125,21 +125,37 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    const [mres, live] = await Promise.all([
+    const [mres, live, settledRes] = await Promise.all([
       fetch(`${OPENFOOTBALL}?cb=${Math.floor(Date.now() / 300_000)}`),
       liveFinished(),
+      // Already-settled results, so a flaky feed can't wipe a known final score.
+      supabase.from('fixtures').select('match_key, ft, result').not('ft', 'is', null),
     ]);
     if (!mres.ok) throw new Error(`openfootball ${mres.status}`);
     const matches = ((await mres.json()) as { matches: Match[] }).matches;
+
+    // Sticky results: once a match has a final score in the table, never let a
+    // later run overwrite it with null. Both upstreams are flaky (openfootball
+    // lags hours; the live feed intermittently drops finished games or fails to
+    // connect), and a blank run upserting null over a settled row is what made
+    // results flicker in and out server-side. So we only ever *add* a result.
+    const settled = new Map<string, { ft: [number, number]; result: string | null }>();
+    for (const r of settledRes.data ?? []) {
+      if (Array.isArray(r.ft)) settled.set(r.match_key, { ft: r.ft as [number, number], result: r.result });
+    }
 
     const rows = [];
     for (const m of matches) {
       if (!isRealTeam(m.team1) || !isRealTeam(m.team2)) continue;
       const k = kickoffMs(m);
       if (k == null) continue;
-      const ft = finalScore(m, live);
+      const key = matchKey(m);
+      const fresh = finalScore(m, live);
+      // Prefer a fresh final (so corrections still land); fall back to the
+      // already-settled value rather than blanking it.
+      const ft = fresh ?? settled.get(key)?.ft ?? null;
       rows.push({
-        match_key: matchKey(m),
+        match_key: key,
         team1: m.team1,
         team2: m.team2,
         kickoff_utc: new Date(k).toISOString(),
