@@ -24,6 +24,13 @@ export interface Fixture {
   grp: string | null;
   result: Pick | null;
   ft: [number, number] | null;
+  // Win probabilities from bookmaker odds (proportionally normalised so they sum
+  // to 1). Populated daily by the sync-odds Edge Function; null until a line is
+  // posted, or for matches no book covers.
+  p1: number | null; // P(team1 win)
+  px: number | null; // P(draw)
+  p2: number | null; // P(team2 win)
+  odds_updated_at: string | null;
 }
 
 export interface PredictionRow {
@@ -97,7 +104,7 @@ export async function submitPrediction(idy: Identity, match_key: string, pick: P
 export async function getFixtures(): Promise<Map<string, Fixture>> {
   const { data } = await supabase
     .from('fixtures')
-    .select('match_key,team1,team2,kickoff_utc,round,grp,result,ft');
+    .select('match_key,team1,team2,kickoff_utc,round,grp,result,ft,p1,px,p2,odds_updated_at');
   const idx = new Map<string, Fixture>();
   for (const f of (data as Fixture[]) ?? []) idx.set(f.match_key, f);
   return idx;

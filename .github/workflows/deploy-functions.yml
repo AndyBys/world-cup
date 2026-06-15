@@ -32,3 +32,8 @@ jobs:
       # SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY at runtime — no extra secrets.
       - name: Deploy sync-fixtures function
         run: supabase functions deploy sync-fixtures --no-verify-jwt --project-ref "$PROJECT_REF"
+      # sync-odds pulls daily 1X2 bookmaker odds into fixtures.p1/px/p2. It reads
+      # ODDS_API_KEY from the function's secrets (set once via
+      # `supabase secrets set ODDS_API_KEY=…`), so no repo secret is needed here.
+      - name: Deploy sync-odds function
+        run: supabase functions deploy sync-odds --no-verify-jwt --project-ref "$PROJECT_REF"

@@ -12,6 +12,7 @@ import { liveFor, LiveIndex } from '../lib/live';
 import { useClock, useLiveScores } from '../lib/useLive';
 import { formatKickoff, useTimezone, ymdInZone } from '../lib/timezone';
 import { TimezonePicker } from '../components/TimezonePicker';
+import { WinChances } from '../components/WinChances';
 import {
   claimPlayer,
   clearIdentity,
@@ -424,6 +425,18 @@ function PredictRow({
         <span className="fx-score">{ft ? `${ft[0]}–${ft[1]}` : ':'}</span>
         {side(m.team2)}
       </div>
+
+      {!fixture.result && (
+        <WinChances
+          className="pred-odds"
+          team1={m.team1}
+          team2={m.team2}
+          p1={fixture.p1}
+          px={fixture.px}
+          p2={fixture.p2}
+          flags={flags}
+        />
+      )}
 
       <div className="pred-choices">
         {options.map(({ pick, cap, team }) => {
