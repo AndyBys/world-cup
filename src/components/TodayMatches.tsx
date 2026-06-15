@@ -15,12 +15,15 @@ import { liveFor, LiveIndex } from '../lib/live';
 import { useClock, useLiveScores } from '../lib/useLive';
 import { useOwners, OwnerIndex } from '../lib/owners';
 import { formatKickoff, useTimezone, ymdInZone } from '../lib/timezone';
+import { getFixtures, matchKey, Fixture as FixtureRow } from '../lib/predictions';
 import { TimezonePicker } from './TimezonePicker';
+import { WinChances } from './WinChances';
 
 /** "Today & tomorrow" fixtures board so friends know when their team is on. */
 export function TodayMatches() {
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [flags, setFlags] = useState<Map<string, string>>(new Map());
+  const [fixtures, setFixtures] = useState<Map<string, FixtureRow>>(new Map());
   const now = useClock(60_000);
   const liveIdx = useLiveScores();
   const owners = useOwners();
@@ -29,6 +32,7 @@ export function TodayMatches() {
   useEffect(() => {
     let alive = true;
     getFlagMap().then((f) => alive && setFlags(f)).catch(() => {});
+    getFixtures().then((f) => alive && setFixtures(f)).catch(() => {});
     const load = (refresh = false) =>
       (refresh ? refreshMatches() : getMatches())
         .then((m) => alive && setMatches(m))
@@ -80,10 +84,10 @@ export function TodayMatches() {
         <TimezonePicker />
       </div>
       {today.length > 0 && (
-        <DayBlock title="Сегодня" sub={todayLabel} matches={today} now={now} flags={flags} liveIdx={liveIdx} owners={owners} tz={tz} />
+        <DayBlock title="Сегодня" sub={todayLabel} matches={today} now={now} flags={flags} fixtures={fixtures} liveIdx={liveIdx} owners={owners} tz={tz} />
       )}
       {tomorrow.length > 0 && (
-        <DayBlock title="Завтра" sub={tomorrowLabel} matches={tomorrow} now={now} flags={flags} liveIdx={liveIdx} owners={owners} tz={tz} />
+        <DayBlock title="Завтра" sub={tomorrowLabel} matches={tomorrow} now={now} flags={flags} fixtures={fixtures} liveIdx={liveIdx} owners={owners} tz={tz} />
       )}
     </section>
   );
@@ -95,6 +99,7 @@ function DayBlock({
   matches,
   now,
   flags,
+  fixtures,
   liveIdx,
   owners,
   tz,
@@ -104,6 +109,7 @@ function DayBlock({
   matches: Match[];
   now: number;
   flags: Map<string, string>;
+  fixtures: Map<string, FixtureRow>;
   liveIdx: LiveIndex;
   owners: OwnerIndex;
   tz: string;
@@ -116,7 +122,7 @@ function DayBlock({
       </div>
       <ul className="fixtures">
         {matches.map((m, i) => (
-          <Fixture key={i} m={m} now={now} flags={flags} liveIdx={liveIdx} owners={owners} tz={tz} />
+          <Fixture key={i} m={m} now={now} flags={flags} fixtures={fixtures} liveIdx={liveIdx} owners={owners} tz={tz} />
         ))}
       </ul>
     </div>
@@ -127,6 +133,7 @@ function Fixture({
   m,
   now,
   flags,
+  fixtures,
   liveIdx,
   owners,
   tz,
@@ -134,13 +141,16 @@ function Fixture({
   m: Match;
   now: number;
   flags: Map<string, string>;
+  fixtures: Map<string, FixtureRow>;
   liveIdx: LiveIndex;
   owners: OwnerIndex;
   tz: string;
 }) {
   const info = liveFor(m, liveIdx);
-  const isLive = (info?.phase ?? matchStatus(m, now)) === 'live';
+  const status = info?.phase ?? matchStatus(m, now);
+  const isLive = status === 'live';
   const ft = isLive ? info?.ft : m.score?.ft ?? info?.ft;
+  const fx = fixtures.get(matchKey(m));
   const o1 = owners.get(m.team1);
   const o2 = owners.get(m.team2);
   const clash = !!o1 && !!o2;
@@ -184,6 +194,17 @@ function Fixture({
         <span className="fx-where">{hostFlag(m.ground)} {shortGround(m.ground)}</span>
       </span>
       {clash && <span className="fx-clash-tag">⚔️ {o1} vs {o2}</span>}
+      {status === 'upcoming' && fx && (
+        <WinChances
+          className="fx-odds"
+          team1={m.team1}
+          team2={m.team2}
+          p1={fx.p1}
+          px={fx.px}
+          p2={fx.p2}
+          flags={flags}
+        />
+      )}
     </li>
   );
 }

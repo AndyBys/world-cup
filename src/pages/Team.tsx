@@ -18,8 +18,10 @@ import { liveFor, overlayFinished, LiveIndex, LivePhase } from '../lib/live';
 import { useClock, useLiveScores } from '../lib/useLive';
 import { useOwners } from '../lib/owners';
 import { formatKickoff, useTimezone } from '../lib/timezone';
+import { getFixtures, matchKey, Fixture as FixtureRow } from '../lib/predictions';
 import { Standings } from '../components/Standings';
 import { TimezonePicker } from '../components/TimezonePicker';
+import { WinChances } from '../components/WinChances';
 
 export function Team() {
   const { team: raw } = useParams();
@@ -28,6 +30,7 @@ export function Team() {
   const [info, setInfo] = useState<TeamInfo | undefined>();
   const [allMatches, setAllMatches] = useState<Match[] | null>(null);
   const [flags, setFlags] = useState<Map<string, string>>(new Map());
+  const [fixtures, setFixtures] = useState<Map<string, FixtureRow>>(new Map());
   const [error, setError] = useState('');
   const now = useClock();
   const liveIdx = useLiveScores();
@@ -39,6 +42,7 @@ export function Team() {
     setAllMatches(null);
     setError('');
     getFlagMap().then((f) => alive && setFlags(f)).catch(() => {});
+    getFixtures().then((f) => alive && setFixtures(f)).catch(() => {});
 
     const load = async (refresh = false) => {
       try {
@@ -157,7 +161,7 @@ export function Team() {
           <h2>Upcoming</h2>
           <ul className="matches">
             {upcoming.map((m, i) => (
-              <MatchRow key={i} m={m} team={team} now={now} idx={liveIdx}  owners={owners} tz={tz} />
+              <MatchRow key={i} m={m} team={team} now={now} idx={liveIdx} owners={owners} tz={tz} flags={flags} odds={fixtures.get(matchKey(m))} />
             ))}
           </ul>
         </section>
@@ -177,6 +181,8 @@ function MatchRow({
   idx,
   owners,
   tz,
+  flags,
+  odds,
 }: {
   m: Match;
   team: string;
@@ -184,6 +190,8 @@ function MatchRow({
   idx: LiveIndex;
   owners: Map<string, string>;
   tz: string;
+  flags?: Map<string, string>;
+  odds?: FixtureRow;
 }) {
   const info = liveFor(m, idx);
   const isLive = (info?.phase ?? matchStatus(m, now)) === 'live';
@@ -242,6 +250,17 @@ function MatchRow({
           ⚽ {[...info!.scorers1, ...info!.scorers2].join(' · ')}
         </span>
       ) : null}
+      {!isLive && !outcome && odds && (
+        <WinChances
+          className="match-odds"
+          team1={m.team1}
+          team2={m.team2}
+          p1={odds.p1}
+          px={odds.px}
+          p2={odds.p2}
+          flags={flags}
+        />
+      )}
     </li>
   );
 }

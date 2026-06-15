@@ -456,6 +456,48 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 .badge.D { background: #5d6880; }
 .badge.L { background: #c4544d; }
 
+/* ===========================================================================
+   Win-chances bar (bookmaker-implied 1/X/2 probabilities)
+   =========================================================================== */
+.win-chances { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.wc-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+.wc-seg { height: 100%; }
+.wc-seg.wc-1 { background: var(--green-deep); }
+.wc-seg.wc-x { background: #5d6880; }
+.wc-seg.wc-2 { background: var(--gold-deep); }
+/* "ничья" label on its own row above the bar, centred over the grey segment. */
+.wc-drawrow { position: relative; height: 14px; }
+.wc-draw {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+/* Team percentages pinned to the bar's two ends, on their own row below it. */
+.wc-ends {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+}
+.wc-end { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; color: #cdd5e4; font-weight: 700; }
+.wc-swatch { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.wc-swatch.wc-1 { background: var(--green-deep); }
+.wc-swatch.wc-2 { background: var(--gold-deep); }
+/* Placement variants per surface. */
+.win-chances.fx-odds { grid-column: 1 / -1; margin-top: 8px; }
+.win-chances.pred-odds { margin: 2px 0 6px; }
+.win-chances.match-odds { grid-column: 1 / -1; margin-top: 8px; }
+
 /* Last-5 form dots on the results board. Each dot links to the team page and
    has its own hover pop-up describing that single match. */
 .form-dots {

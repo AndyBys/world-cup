@@ -1,0 +1,31 @@
+name: Sync odds
+
+# Pings the sync-odds Edge Function once a day so per-match win probabilities
+# (fixtures.p1/px/p2) stay roughly current. Daily is plenty — bookmaker lines for
+# the next day or two don't move enough to matter for a casual win-% display, and
+# it keeps us comfortably inside The Odds API free tier (~30 calls/month).
+#
+# The function is deployed with --no-verify-jwt, so a plain GET works — no secrets
+# needed here (the ODDS_API_KEY lives in the function's own secrets).
+on:
+  schedule:
+    - cron: '0 9 * * *' # 09:00 UTC daily
+  workflow_dispatch:
+
+concurrency:
+  group: sync-odds
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call sync-odds
+        run: |
+          echo "Calling sync-odds…"
+          body=$(curl -sS -w "\n%{http_code}" \
+            https://lmjanuwzvihbffhayxws.supabase.co/functions/v1/sync-odds)
+          code=$(echo "$body" | tail -n1)
+          echo "$body" | sed '$d'
+          echo "HTTP $code"
+          test "$code" = "200"
