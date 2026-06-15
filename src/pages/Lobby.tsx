@@ -2,7 +2,18 @@ import { useEffect, useMemo, useState, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase, friendlyError, Player } from '../lib/supabase';
 import { STAKE, TOURNAMENT_NAME } from '../lib/config';
-import { getTeams, Team } from '../lib/worldcup';
+import {
+  getTeams,
+  getMatches,
+  recentResults,
+  stageLabel,
+  shortDate,
+  Team,
+  Match,
+  TeamResult,
+} from '../lib/worldcup';
+import { overlayFinished } from '../lib/live';
+import { useLiveScores } from '../lib/useLive';
 import { CURRENCIES, convert, getRates } from '../lib/currency';
 import { poolByOdds } from '../lib/pool';
 import { ULTRA_TEAMS } from '../lib/ultra';
@@ -36,7 +47,9 @@ async function loadState(): Promise<GameState> {
 export function Lobby() {
   const [state, setState] = useState<GameState | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [matches, setMatches] = useState<Match[] | null>(null);
   const [myId, setMyId] = useState<string | null>(() => localStorage.getItem(MY_ID_KEY));
+  const liveIdx = useLiveScores();
 
   // Initial load + light polling so the lobby updates as friends join / draw runs.
   useEffect(() => {
@@ -45,6 +58,7 @@ export function Lobby() {
     refresh();
     const t = setInterval(refresh, 4000);
     getTeams().then((t) => alive && setTeams(t)).catch(() => {});
+    getMatches().then((m) => alive && setMatches(m)).catch(() => {});
     return () => {
       alive = false;
       clearInterval(t);
@@ -55,6 +69,17 @@ export function Lobby() {
     () => new Map(teams.map((t) => [t.name, t.flag_icon ?? '⚽'])),
     [teams],
   );
+
+  // Per-team recent results (oldest→newest), live-overlaid so finished games
+  // count the moment the feed reports them. Powers the form dots on the board.
+  const formByTeam = useMemo(() => {
+    if (!matches) return new Map<string, TeamResult[]>();
+    const overlaid = overlayFinished(matches, liveIdx);
+    const teamNames = new Set(state ? [...state.assignments.values()] : []);
+    const m = new Map<string, TeamResult[]>();
+    for (const name of teamNames) m.set(name, recentResults(overlaid, name, 5));
+    return m;
+  }, [matches, liveIdx, state]);
 
   const handleJoined = (id: string) => {
     localStorage.setItem(MY_ID_KEY, id);
@@ -103,6 +128,7 @@ export function Lobby() {
           state={state}
           myId={myId}
           flags={flags}
+          formByTeam={formByTeam}
           alreadyJoined={alreadyJoined}
           onJoined={handleJoined}
         />
@@ -402,16 +428,69 @@ function Lobbying({
   );
 }
 
+const OUTCOME_RU = { W: 'Победа', D: 'Ничья', L: 'Поражение' } as const;
+
+/**
+ * Last-5 results for a team as colour dots (oldest→newest). Each dot is its own
+ * link to the team page and shows a hover pop-up with that single match's
+ * detail. Empty until the team has played (or fixtures haven't loaded).
+ */
+function FormDots({
+  team,
+  results,
+  flags,
+}: {
+  team: string;
+  results: TeamResult[];
+  flags: Map<string, string>;
+}) {
+  if (results.length === 0) return <span className="muted">—</span>;
+
+  return (
+    <div className="form-dots">
+      {results.map((r, i) => {
+        const opp = r.match.team1 === team ? r.match.team2 : r.match.team1;
+        const ft = r.match.score!.ft!;
+        const score = r.match.team1 === team ? `${ft[0]}–${ft[1]}` : `${ft[1]}–${ft[0]}`;
+        return (
+          <Link
+            key={i}
+            className="form-dot-wrap"
+            to={`/team/${encodeURIComponent(team)}`}
+            aria-label={`${OUTCOME_RU[r.outcome]} ${score} ${opp}`}
+          >
+            <span className={`form-dot ${r.outcome}`} />
+            <span className="form-popup" role="tooltip">
+              <span className="form-popup-row">
+                <span className="fp-team-flag">{flags.get(team) ?? '⚽'}</span>
+                <span className="fp-score">{score}</span>
+                <span className="fp-opp">
+                  {flags.get(opp) ?? '⚽'} {opp}
+                </span>
+              </span>
+              <span className="fp-meta muted">
+                {OUTCOME_RU[r.outcome]} · {shortDate(r.match.date)} · {stageLabel(r.match)}
+              </span>
+            </span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 function Results({
   state,
   myId,
   flags,
+  formByTeam,
   alreadyJoined,
   onJoined,
 }: {
   state: GameState;
   myId: string | null;
   flags: Map<string, string>;
+  formByTeam: Map<string, TeamResult[]>;
   alreadyJoined: boolean;
   onJoined: (id: string) => void;
 }) {
@@ -427,7 +506,7 @@ function Results({
           <tr>
             <th>Друг</th>
             <th>Команда</th>
-            <th>Взнос</th>
+            <th>Последние 5 матчей</th>
           </tr>
         </thead>
         <tbody>
@@ -447,12 +526,22 @@ function Results({
                   <span className="muted">—</span>
                 )}
               </td>
-              <td className="stake">${STAKE}</td>
+              <td>
+                {team ? (
+                  <FormDots team={team} results={formByTeam.get(team) ?? []} flags={flags} />
+                ) : (
+                  <span className="muted">—</span>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="muted small">Нажми на команду — увидишь её группу, расписание и результаты.</p>
+      <p className="muted small">
+        Цветные точки — последние матчи команды (зелёный — победа, серый —
+        ничья, красный — поражение). Наведи — детали, нажми — группа, расписание
+        и все матчи.
+      </p>
 
       {!alreadyJoined && (
         <div className="late-join">

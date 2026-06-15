@@ -5,8 +5,13 @@ import { getLiveIndex, LiveIndex } from './live';
  * Polls the live-score feed (via our Supabase proxy) every `periodMs`, starting
  * immediately. Returns an empty index until the first response (and if the feed
  * is unavailable), so callers can always fall back to openfootball/schedule.
+ *
+ * Polls every 10s by default: the edge proxy caches upstream for ~10s, so this
+ * surfaces a finished/changed score within ~10–20s without hammering the
+ * rate-limited source (the edge cache caps upstream fetches regardless of how
+ * many clients poll).
  */
-export function useLiveScores(periodMs = 30_000): LiveIndex {
+export function useLiveScores(periodMs = 10_000): LiveIndex {
   const [idx, setIdx] = useState<LiveIndex>(() => new Map());
   useEffect(() => {
     let alive = true;

@@ -10,6 +10,7 @@ import {
   isPlayed,
   matchStatus,
   kickoffMs,
+  resultFor,
   Match,
   Team as TeamInfo,
 } from '../lib/worldcup';
@@ -167,18 +168,6 @@ export function Team() {
       )}
     </div>
   );
-}
-
-/** 'W' | 'D' | 'L' from the perspective of `team`, or null if not played. */
-function resultFor(m: Match, team: string): 'W' | 'D' | 'L' | null {
-  if (!m.score?.ft) return null;
-  const [g1, g2] = m.score.ft;
-  const isHome = m.team1 === team;
-  const my = isHome ? g1 : g2;
-  const opp = isHome ? g2 : g1;
-  if (my > opp) return 'W';
-  if (my < opp) return 'L';
-  return 'D';
 }
 
 function MatchRow({

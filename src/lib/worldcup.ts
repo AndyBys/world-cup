@@ -274,6 +274,35 @@ export function matchStatus(m: Match, now: number = Date.now()): MatchStatus {
   return 'finished'; // window has passed; score simply not in the feed yet
 }
 
+/** 'W' | 'D' | 'L' from the perspective of `team`, or null if not yet played. */
+export function resultFor(m: Match, team: string): 'W' | 'D' | 'L' | null {
+  if (!m.score?.ft) return null;
+  const [g1, g2] = m.score.ft;
+  const isHome = m.team1 === team;
+  const my = isHome ? g1 : g2;
+  const opp = isHome ? g2 : g1;
+  if (my > opp) return 'W';
+  if (my < opp) return 'L';
+  return 'D';
+}
+
+export interface TeamResult {
+  match: Match;
+  outcome: 'W' | 'D' | 'L';
+}
+
+/**
+ * A team's most recent played results, oldest-first, capped at `n`. Pass already
+ * live-overlaid matches so freshly-finished games count immediately.
+ */
+export function recentResults(matches: Match[], team: string, n = 5): TeamResult[] {
+  return matches
+    .filter((m) => (m.team1 === team || m.team2 === team) && isPlayed(m))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
+    .slice(-n)
+    .map((m) => ({ match: m, outcome: resultFor(m, team)! }));
+}
+
 /** All matches involving a team, chronologically. */
 export async function getTeamMatches(name: string): Promise<Match[]> {
   const matches = await getMatches();

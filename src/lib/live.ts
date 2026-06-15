@@ -94,7 +94,13 @@ function toLiveGame(g: RawGame): LiveGame {
 export async function getLiveIndex(): Promise<LiveIndex> {
   if (!ENDPOINT) return new Map();
   try {
-    const r = await fetch(ENDPOINT, { headers: { accept: 'application/json' } });
+    // `no-store`: never let the browser/CDN serve a stale cached copy — each
+    // poll must reach the edge function. The upstream is still shielded by the
+    // edge's own short in-memory cache, so this doesn't increase upstream load.
+    const r = await fetch(ENDPOINT, {
+      headers: { accept: 'application/json' },
+      cache: 'no-store',
+    });
     if (!r.ok) throw new Error(`live ${r.status}`);
     const data = (await r.json()) as { games?: RawGame[] };
     const idx: LiveIndex = new Map();
