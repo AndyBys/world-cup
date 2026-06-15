@@ -90,8 +90,15 @@ function toLiveGame(g: RawGame): LiveGame {
   };
 }
 
-/** Fetches the live feed and indexes it by team pair. Empty map on any failure. */
-export async function getLiveIndex(): Promise<LiveIndex> {
+/**
+ * Fetches the live feed and indexes it by team pair.
+ *
+ * Returns `null` on any failure (network blip, non-2xx, rate-limited upstream)
+ * so callers can distinguish "the poll failed" from "the feed is genuinely
+ * empty" and keep the last good index instead of blanking the UI. A successful
+ * fetch always returns a Map (possibly empty).
+ */
+export async function getLiveIndex(): Promise<LiveIndex | null> {
   if (!ENDPOINT) return new Map();
   try {
     // `no-store`: never let the browser/CDN serve a stale cached copy — each
@@ -110,8 +117,33 @@ export async function getLiveIndex(): Promise<LiveIndex> {
     }
     return idx;
   } catch {
-    return new Map(); // feed down → callers fall back to openfootball/schedule
+    return null; // poll failed → callers keep the last good index
   }
+}
+
+/**
+ * Merges a freshly-fetched index into the one we already hold, so transient
+ * feed hiccups and the upstream's habit of dropping finished games a few
+ * minutes after the whistle don't make results flicker in and out.
+ *
+ * Rules:
+ *  - A failed poll (`next === null`) leaves the held index untouched.
+ *  - Fresh data wins on conflict (scores/minute update as the match plays).
+ *  - A game we've already seen `finished` is sticky: once final, it never
+ *    reverts and is never dropped, even if the feed stops listing it.
+ *
+ * The index only grows to the tournament's match count, so this can't leak.
+ */
+export function mergeLiveIndex(prev: LiveIndex, next: LiveIndex | null): LiveIndex {
+  if (next === null) return prev;
+  const merged: LiveIndex = new Map(prev);
+  for (const [key, game] of next) {
+    const held = merged.get(key);
+    // Don't let a finished result get overwritten by a non-final reading.
+    if (held?.phase === 'finished' && game.phase !== 'finished') continue;
+    merged.set(key, game);
+  }
+  return merged;
 }
 
 export interface LiveInfo {

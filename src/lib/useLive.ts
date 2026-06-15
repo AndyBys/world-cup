@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getLiveIndex, LiveIndex } from './live';
+import { getLiveIndex, LiveIndex, mergeLiveIndex } from './live';
 
 /**
  * Polls the live-score feed (via our Supabase proxy) every `periodMs`, starting
@@ -10,12 +10,17 @@ import { getLiveIndex, LiveIndex } from './live';
  * surfaces a finished/changed score within ~10–20s without hammering the
  * rate-limited source (the edge cache caps upstream fetches regardless of how
  * many clients poll).
+ *
+ * Each poll is *merged* into the held index (see {@link mergeLiveIndex}) rather
+ * than replacing it, so a single failed poll or the upstream dropping a
+ * just-finished game doesn't make results flicker in and out.
  */
 export function useLiveScores(periodMs = 10_000): LiveIndex {
   const [idx, setIdx] = useState<LiveIndex>(() => new Map());
   useEffect(() => {
     let alive = true;
-    const load = () => getLiveIndex().then((i) => alive && setIdx(i));
+    const load = () =>
+      getLiveIndex().then((next) => alive && setIdx((prev) => mergeLiveIndex(prev, next)));
     load();
     const id = setInterval(load, periodMs);
     return () => {
