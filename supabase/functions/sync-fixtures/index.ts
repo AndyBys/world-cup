@@ -87,11 +87,18 @@ async function liveFinished(): Promise<Map<string, [number, number]>> {
     const data = (await r.json()) as { games?: RawGame[] };
     for (const g of data.games ?? []) {
       if (g.finished !== 'TRUE' || !g.home_team_name_en || !g.away_team_name_en) continue;
+      const hs = Number(g.home_score) || 0;
+      const as = Number(g.away_score) || 0;
+      // The live feed reports a placeholder 0-0 for matches it has marked
+      // finished but hasn't got the real score for yet, so a 0-0 here is more
+      // likely "score unknown" than a genuine goalless draw. Don't settle on
+      // it — leave the match open and let openfootball (authoritative, and the
+      // only source that can confirm a real 0-0) fill it in.
+      if (hs === 0 && as === 0) continue;
       const key = [canon(g.home_team_name_en), canon(g.away_team_name_en)].sort().join('|');
-      out.set(key, [Number(g.home_score) || 0, Number(g.away_score) || 0]);
+      out.set(key, [hs, as]);
       // Store oriented-by-home too, so we can re-orient to team1/team2 below.
-      out.set(`home:${canon(g.home_team_name_en)}|${canon(g.away_team_name_en)}`,
-        [Number(g.home_score) || 0, Number(g.away_score) || 0]);
+      out.set(`home:${canon(g.home_team_name_en)}|${canon(g.away_team_name_en)}`, [hs, as]);
     }
   } catch {
     /* feed down → settle only what openfootball already has */

@@ -129,8 +129,9 @@ export async function getLiveIndex(): Promise<LiveIndex | null> {
  * Rules:
  *  - A failed poll (`next === null`) leaves the held index untouched.
  *  - Fresh data wins on conflict (scores/minute update as the match plays).
- *  - A game we've already seen `finished` is sticky: once final, it never
- *    reverts and is never dropped, even if the feed stops listing it.
+ *  - A game we've already seen finished *with a real score* is sticky: it never
+ *    reverts and is never dropped, even if the feed stops listing it or flickers
+ *    back to its placeholder 0-0-finished reading.
  *
  * The index only grows to the tournament's match count, so this can't leak.
  */
@@ -139,11 +140,18 @@ export function mergeLiveIndex(prev: LiveIndex, next: LiveIndex | null): LiveInd
   const merged: LiveIndex = new Map(prev);
   for (const [key, game] of next) {
     const held = merged.get(key);
-    // Don't let a finished result get overwritten by a non-final reading.
-    if (held?.phase === 'finished' && game.phase !== 'finished') continue;
+    // Don't let a confirmed final get clobbered by a weaker reading — neither a
+    // non-final phase nor the feed's placeholder 0-0-finished (which we don't
+    // trust as a real result; see liveFor).
+    if (hasRealFinal(held) && !hasRealFinal(game)) continue;
     merged.set(key, game);
   }
   return merged;
+}
+
+/** A finished game with an actual score (the feed's 0-0-finished is a placeholder). */
+function hasRealFinal(g: LiveGame | undefined): boolean {
+  return !!g && g.phase === 'finished' && !(g.hs === 0 && g.as === 0);
 }
 
 export interface LiveInfo {
@@ -159,6 +167,11 @@ export interface LiveInfo {
 export function liveFor(m: Match, idx: LiveIndex): LiveInfo | null {
   const g = idx.get(pairKey(m.team1, m.team2));
   if (!g) return null;
+  // The feed reports a placeholder 0-0 for games it has marked finished but
+  // doesn't yet have the real score for. Treat that as "no result yet" (mirrors
+  // sync-fixtures) so we don't flash a phantom 0-0 final; the match falls back
+  // to its scheduled status until openfootball confirms the score.
+  if (g.phase === 'finished' && g.hs === 0 && g.as === 0) return null;
   const sameOrder = canon(m.team1) === canon(g.home);
   const ft: [number, number] = sameOrder ? [g.hs, g.as] : [g.as, g.hs];
   return {
