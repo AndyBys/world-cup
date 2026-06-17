@@ -30,6 +30,14 @@ export interface Score {
   ht?: [number, number];
 }
 
+/** A goal from openfootball, e.g. { name: "Kai Havertz", minute: "45+5", penalty: true }. */
+export interface Goal {
+  name: string;
+  minute: string; // e.g. "9" or "90+6"
+  penalty?: boolean;
+  owngoal?: boolean;
+}
+
 export interface Match {
   round: string;
   date: string; // ISO yyyy-mm-dd
@@ -39,6 +47,8 @@ export interface Match {
   group?: string; // e.g. "Group A" (absent for knockout rounds)
   ground: string;
   score?: Score;
+  goals1?: Goal[]; // goals credited to team1 (own goals list the opponent scorer)
+  goals2?: Goal[]; // goals credited to team2
 }
 
 export interface Team {
@@ -329,6 +339,50 @@ export async function getTeamMatches(name: string): Promise<Match[]> {
   return matches
     .filter((m) => m.team1 === name || m.team2 === name)
     .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+}
+
+/** Short scorer label, e.g. "Havertz 45+5' (pen)" / "Bobadilla 7' (og)". */
+export function goalLabel(g: Goal): string {
+  const mark = g.owngoal ? ' (og)' : g.penalty ? ' (pen)' : '';
+  return `${g.name} ${g.minute}'${mark}`;
+}
+
+export interface ScorerRow {
+  name: string;
+  team: string;
+  goals: number;
+  penalties: number;
+}
+
+/**
+ * Golden-Boot table: goals per player across all played matches, most first.
+ * Own goals are excluded (they don't credit the scorer). A player is keyed by
+ * name + scoring team, so the rare same-name case across teams stays separate.
+ */
+export function topScorers(matches: Match[]): ScorerRow[] {
+  const table = new Map<string, ScorerRow>();
+  for (const m of matches) {
+    // An own goal is credited to the opposing team, so the scorer actually plays
+    // for the *other* side — and we drop it from the Golden Boot entirely below.
+    const credited: { team: string; goal: Goal }[] = [
+      ...(m.goals1 ?? []).map((goal) => ({ team: m.team1, goal })),
+      ...(m.goals2 ?? []).map((goal) => ({ team: m.team2, goal })),
+    ];
+    for (const { team, goal } of credited) {
+      if (goal.owngoal) continue;
+      const key = `${goal.name}|${team}`;
+      let r = table.get(key);
+      if (!r) {
+        r = { name: goal.name, team, goals: 0, penalties: 0 };
+        table.set(key, r);
+      }
+      r.goals++;
+      if (goal.penalty) r.penalties++;
+    }
+  }
+  return [...table.values()].sort(
+    (a, b) => b.goals - a.goals || a.penalties - b.penalties || a.name.localeCompare(b.name),
+  );
 }
 
 export interface StandingRow {

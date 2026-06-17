@@ -6,6 +6,7 @@ import {
   getFlagMap,
   refreshMatches,
   computeStandings,
+  topScorers,
   Bracket as BracketData,
   Match,
 } from '../lib/worldcup';
@@ -14,13 +15,14 @@ import { useClock, useLiveScores } from '../lib/useLive';
 import { useOwners } from '../lib/owners';
 import { Standings } from '../components/Standings';
 import { Bracket } from '../components/Bracket';
+import { TopScorers } from '../components/TopScorers';
 
 export function Tournament() {
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [bracket, setBracket] = useState<BracketData | null>(null);
   const [flags, setFlags] = useState<Map<string, string>>(new Map());
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<'groups' | 'bracket'>('bracket');
+  const [tab, setTab] = useState<'groups' | 'bracket' | 'scorers'>('bracket');
   const now = useClock();
   const liveIdx = useLiveScores();
   const owners = useOwners();
@@ -57,6 +59,9 @@ export function Tournament() {
     return labels.map((label) => ({ label, rows: computeStandings(overlaid, label) }));
   }, [matches, liveIdx]);
 
+  // Golden Boot: openfootball's permanent goal lists (independent of the live feed).
+  const scorers = useMemo(() => (matches ? topScorers(matches) : null), [matches]);
+
   return (
     <div className="page">
       <div className="container">
@@ -74,6 +79,9 @@ export function Tournament() {
           </button>
           <button className={tab === 'groups' ? 'tab on' : 'tab'} onClick={() => setTab('groups')}>
             Groups
+          </button>
+          <button className={tab === 'scorers' ? 'tab on' : 'tab'} onClick={() => setTab('scorers')}>
+            Scorers
           </button>
         </div>
 
@@ -101,6 +109,19 @@ export function Tournament() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {tab === 'scorers' && (
+        <div className="container">
+          <section className="card">
+            <h2>⚽ Top scorers</h2>
+            {!scorers ? (
+              <p className="muted">Loading scorers…</p>
+            ) : (
+              <TopScorers rows={scorers} flags={flags} />
+            )}
+          </section>
         </div>
       )}
     </div>

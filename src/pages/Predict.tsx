@@ -257,6 +257,7 @@ function Leaderboard({ board, meId }: { board: LeaderboardRow[]; meId?: string }
             <span className="pb-rank">#</span>
             <span className="pb-name">Игрок</span>
             <span className="pb-num" title="Очки за угаданные исходы">Очки</span>
+            <span className="pb-acc" title="Доля угаданных из сыгранных">Точность</span>
             <span className="pb-guessed" title="Угадано из сыгранных матчей">Угадано</span>
           </li>
           {board.map((r, i) => (
@@ -264,6 +265,9 @@ function Leaderboard({ board, meId }: { board: LeaderboardRow[]; meId?: string }
               <span className="pb-rank">{i + 1}</span>
               <span className="pb-name">{r.name}</span>
               <span className="pb-num pb-pts">{r.points}</span>
+              <span className="pb-acc">
+                {r.settled > 0 ? `${Math.round((r.points / r.settled) * 100)}%` : '—'}
+              </span>
               <span className="pb-guessed">
                 {r.settled > 0 ? `${r.points} из ${r.settled}` : '—'}
               </span>

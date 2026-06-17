@@ -14,7 +14,7 @@ import {
   Match,
   Team as TeamInfo,
 } from '../lib/worldcup';
-import { liveFor, overlayFinished, LiveIndex, LivePhase } from '../lib/live';
+import { liveFor, overlayFinished, scorerLines, LiveIndex, LivePhase } from '../lib/live';
 import { useClock, useLiveScores } from '../lib/useLive';
 import { useOwners } from '../lib/owners';
 import { formatKickoff, useTimezone } from '../lib/timezone';
@@ -131,7 +131,7 @@ export function Team() {
           </h2>
           <ul className="matches">
             {live.map((m, i) => (
-              <MatchRow key={i} m={m} team={team} now={now} idx={liveIdx}  owners={owners} tz={tz} />
+              <MatchRow key={i} m={m} team={team} now={now} idx={liveIdx} owners={owners} tz={tz} flags={flags} />
             ))}
           </ul>
         </section>
@@ -150,7 +150,7 @@ export function Team() {
           <h2>Results</h2>
           <ul className="matches">
             {results.map((m, i) => (
-              <MatchRow key={i} m={m} team={team} now={now} idx={liveIdx}  owners={owners} tz={tz} />
+              <MatchRow key={i} m={m} team={team} now={now} idx={liveIdx} owners={owners} tz={tz} flags={flags} />
             ))}
           </ul>
         </section>
@@ -197,7 +197,9 @@ function MatchRow({
   const isLive = (info?.phase ?? matchStatus(m, now)) === 'live';
   const ft = isLive ? info?.ft : m.score?.ft;
   const outcome = resultFor(m, team);
-  const scorers = info && (info.scorers1.length || info.scorers2.length);
+  // Scorers grouped by team (one line each), with flags so it's clear who scored
+  // for whom. Live feed while in progress; openfootball's permanent list at FT.
+  const scorerLines_ = scorerLines(m, info, flags ?? new Map());
   const opponent = m.team1 === team ? m.team2 : m.team1;
   const oppOwner = owners.get(opponent);
 
@@ -245,9 +247,13 @@ function MatchRow({
         )}
       </span>
       <span className="match-ground muted">{m.ground}</span>
-      {isLive && scorers ? (
+      {scorerLines_.length > 0 ? (
         <span className="match-scorers muted small">
-          ⚽ {[...info!.scorers1, ...info!.scorers2].join(' · ')}
+          {scorerLines_.map((l) => (
+            <span key={l.team} className="scorer-line">
+              <span className="scorer-flag">{l.flag || '⚽'}</span> {l.scorers.join(', ')}
+            </span>
+          ))}
         </span>
       ) : null}
       {!isLive && !outcome && odds && (

@@ -4,7 +4,7 @@
 // team pair* — each pairing is unique in the tournament — then orient the score
 // to whichever side is team1/team2 in our data.
 
-import { Match } from './worldcup';
+import { Match, goalLabel, isPlayed } from './worldcup';
 
 // In dev, hit the Vite proxy (see vite.config.ts) which forwards to worldcup26.ir.
 // In production, hit the Supabase Edge Function, which does the same CORS-adding
@@ -181,6 +181,40 @@ export function liveFor(m: Match, idx: LiveIndex): LiveInfo | null {
     scorers1: sameOrder ? g.homeScorers : g.awayScorers,
     scorers2: sameOrder ? g.awayScorers : g.homeScorers,
   };
+}
+
+export interface TeamScorers {
+  team: string;
+  flag: string;
+  scorers: string[]; // formatted goal labels, e.g. ["Quiñones 9'", "Jiménez 67'"]
+}
+
+/**
+ * Scorers grouped by team for a match row — one entry per team that scored, so
+ * the UI can render a line each. Uses the live feed while a match is in progress,
+ * else openfootball's permanent goal lists once it's finished. Empty if there's
+ * nothing to show (no scorers, or the match hasn't been played).
+ */
+export function scorerLines(
+  m: Match,
+  info: LiveInfo | null,
+  flags: Map<string, string>,
+): TeamScorers[] {
+  let s1: string[];
+  let s2: string[];
+  if (info?.phase === 'live') {
+    s1 = info.scorers1;
+    s2 = info.scorers2;
+  } else if (isPlayed(m)) {
+    s1 = (m.goals1 ?? []).map(goalLabel);
+    s2 = (m.goals2 ?? []).map(goalLabel);
+  } else {
+    return [];
+  }
+  const lines: TeamScorers[] = [];
+  if (s1.length) lines.push({ team: m.team1, flag: flags.get(m.team1) ?? '', scorers: s1 });
+  if (s2.length) lines.push({ team: m.team2, flag: flags.get(m.team2) ?? '', scorers: s2 });
+  return lines;
 }
 
 /**

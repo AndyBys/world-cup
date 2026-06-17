@@ -393,6 +393,16 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 }
 .standings tr:last-child td { border-bottom: none; }
 .standings .pts { font-weight: 800; color: #fff; }
+
+/* ---- Top scorers (Golden Boot) ---- */
+.scorers-table { width: 100%; border-collapse: collapse; }
+.scorers-table th, .scorers-table td { padding: 9px 6px; border-bottom: 1px solid var(--border); }
+.scorers-table th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-align: left; }
+.scorers-table th.rank, .scorers-table td.rank { width: 38px; text-align: left; }
+.scorers-table th.num, .scorers-table td.num { width: 56px; text-align: right; }
+.scorers-table tr:last-child td { border-bottom: none; }
+.scorers-table .scorer-name { font-weight: 600; }
+.scorers-table .num strong { color: #fff; }
 .team-cell { overflow: hidden; white-space: nowrap; }
 .standings .team-pill { max-width: 100%; min-width: 0; }
 .standings .tp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
@@ -441,6 +451,11 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 .me-team { color: var(--gold); }
 .match-when { font-size: 0.85rem; color: var(--muted); }
 .match-ground { font-size: 0.8rem; }
+/* Match scorers — one line per team, each prefixed by its flag. */
+.match-scorers { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
+.match-scorers .scorer-line { display: block; }
+.match-scorers .scorer-flag { font-size: 0.95rem; }
+.fx-scorers { grid-column: 1 / -1; margin-top: 2px; }
 
 .badge {
   display: inline-flex;
@@ -1079,7 +1094,7 @@ a.mside:hover .mside-name { color: var(--green); }
   padding: 8px 6px;
   border-bottom: 1px solid var(--border);
 }
-.pred-board.results li      { grid-template-columns: 26px 1fr 52px 92px; }
+.pred-board.results li      { grid-template-columns: 26px 1fr 52px 72px 92px; }
 .pred-board.participation li { grid-template-columns: 1fr auto; }
 .pred-board li:last-child { border-bottom: none; }
 .pred-board .pb-head {
@@ -1092,6 +1107,7 @@ a.mside:hover .mside-name { color: var(--green); }
 .pred-board .pb-rank { color: var(--muted); font-variant-numeric: tabular-nums; }
 .pred-board .pb-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pred-board .pb-num { text-align: center; font-variant-numeric: tabular-nums; }
+.pred-board .pb-acc { text-align: center; color: var(--muted); font-size: 0.86rem; font-variant-numeric: tabular-nums; }
 .pred-board .pb-guessed { text-align: right; color: var(--muted); font-size: 0.86rem; font-variant-numeric: tabular-nums; }
 .pred-board .pb-head.pb-guessed, .pred-board .pb-head .pb-guessed { text-align: right; }
 .pred-board .pb-pts { font-weight: 800; color: #fff; }

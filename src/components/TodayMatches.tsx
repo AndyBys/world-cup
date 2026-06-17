@@ -11,7 +11,7 @@ import {
   matchStatus,
   Match,
 } from '../lib/worldcup';
-import { liveFor, LiveIndex } from '../lib/live';
+import { liveFor, scorerLines, LiveIndex } from '../lib/live';
 import { useClock, useLiveScores } from '../lib/useLive';
 import { useOwners, OwnerIndex } from '../lib/owners';
 import { formatKickoff, useTimezone, ymdInZone } from '../lib/timezone';
@@ -154,6 +154,7 @@ function Fixture({
   const o1 = owners.get(m.team1);
   const o2 = owners.get(m.team2);
   const clash = !!o1 && !!o2;
+  const goals = scorerLines(m, info, flags);
 
   const side = (name: string, owner?: string) => {
     const flag = flags.get(name);
@@ -193,6 +194,15 @@ function Fixture({
         <span className="fx-stage">{stageLabel(m)}</span>
         <span className="fx-where">{hostFlag(m.ground)} {shortGround(m.ground)}</span>
       </span>
+      {goals.length > 0 && (
+        <span className="fx-scorers match-scorers muted small">
+          {goals.map((l) => (
+            <span key={l.team} className="scorer-line">
+              <span className="scorer-flag">{l.flag || '⚽'}</span> {l.scorers.join(', ')}
+            </span>
+          ))}
+        </span>
+      )}
       {clash && <span className="fx-clash-tag">⚔️ {o1} vs {o2}</span>}
       {status === 'upcoming' && fx && (
         <WinChances
