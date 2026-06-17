@@ -17,9 +17,28 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const OPENFOOTBALL =
+// Source priority: raw.githubusercontent FIRST (served fresh, max-age=300), with
+// jsDelivr as an availability fallback. jsDelivr caches the @master branch ref for
+// up to ~12h and ignores our `?cb=` query string, so it can serve a stale snapshot
+// that's missing freshly-entered scores — which is exactly what stranded the
+// Argentina 3-0 result. We hit raw GitHub first so finished scores settle promptly.
+const OPENFOOTBALL_PRIMARY =
+  'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
+const OPENFOOTBALL_FALLBACK =
   'https://cdn.jsdelivr.net/gh/openfootball/worldcup.json@master/2026/worldcup.json';
 const LIVE = 'https://worldcup26.ir/get/games';
+
+/** Fetch the openfootball schedule fresh, falling back to the jsDelivr CDN. */
+async function fetchOpenfootball(): Promise<Response> {
+  const cb = `?cb=${Math.floor(Date.now() / 300_000)}`;
+  try {
+    const r = await fetch(`${OPENFOOTBALL_PRIMARY}${cb}`);
+    if (r.ok) return r;
+  } catch {
+    /* primary unreachable → fall through to CDN */
+  }
+  return fetch(`${OPENFOOTBALL_FALLBACK}${cb}`);
+}
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -133,7 +152,7 @@ Deno.serve(async (req) => {
     );
 
     const [mres, live, settledRes] = await Promise.all([
-      fetch(`${OPENFOOTBALL}?cb=${Math.floor(Date.now() / 300_000)}`),
+      fetchOpenfootball(),
       liveFinished(),
       // Already-settled results, so a flaky feed can't wipe a known final score.
       supabase.from('fixtures').select('match_key, ft, result').not('ft', 'is', null),

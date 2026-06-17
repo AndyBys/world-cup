@@ -1,8 +1,29 @@
-// Fetches public-domain World Cup 2026 data from openfootball via the jsDelivr
-// CDN (which sends CORS headers, so the browser can fetch it directly).
+// Fetches public-domain World Cup 2026 data from openfootball.
 // No API key required. https://github.com/openfootball/worldcup.json
+//
+// Source priority — raw.githubusercontent FIRST, jsDelivr as fallback:
+//   * raw.githubusercontent serves the file fresh (cache-control max-age=300) and
+//     sends `Access-Control-Allow-Origin: *`, so the browser can fetch it directly.
+//   * jsDelivr is a nicer CDN but caches a *branch* ref (@master) for up to ~12h and
+//     ignores our `?cb=` query string when keying its cache, so it can serve a stale
+//     snapshot missing freshly-entered scores. We keep it only as an availability
+//     fallback if raw GitHub is unreachable.
+// Both send CORS headers. We try them in order so a fresh score shows within minutes.
 
-const BASE = 'https://cdn.jsdelivr.net/gh/openfootball/worldcup.json@master/2026';
+const PRIMARY = 'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026';
+const FALLBACK = 'https://cdn.jsdelivr.net/gh/openfootball/worldcup.json@master/2026';
+
+/** Fetch a worldcup file fresh, falling back to the jsDelivr CDN on failure. */
+async function fetchJson(file: string, cacheBust = false): Promise<Response> {
+  const qs = cacheBust ? `?cb=${Math.floor(Date.now() / 300_000)}` : '';
+  try {
+    const r = await fetch(`${PRIMARY}/${file}${qs}`);
+    if (r.ok) return r;
+  } catch {
+    /* primary unreachable → fall through to CDN */
+  }
+  return fetch(`${FALLBACK}/${file}${qs}`);
+}
 
 export interface Score {
   ft?: [number, number];
@@ -41,10 +62,9 @@ let teamsCache: Promise<Team[]> | null = null;
 
 export function getMatches(): Promise<Match[]> {
   if (!matchesCache) {
-    // Cache-bust in 5-minute buckets so a long-lived tab (and the CDN/browser
+    // Cache-bust in 5-minute buckets so a long-lived tab (and the browser
     // cache) picks up freshly-entered scores on match days without a hard reload.
-    const bucket = Math.floor(Date.now() / 300_000);
-    matchesCache = fetch(`${BASE}/worldcup.json?cb=${bucket}`)
+    matchesCache = fetchJson('worldcup.json', true)
       .then((r) => {
         if (!r.ok) throw new Error(`Failed to load fixtures (${r.status})`);
         return r.json() as Promise<WorldCupFile>;
@@ -66,7 +86,7 @@ export function refreshMatches(): Promise<Match[]> {
 
 export function getTeams(): Promise<Team[]> {
   if (!teamsCache) {
-    teamsCache = fetch(`${BASE}/worldcup.teams.json`)
+    teamsCache = fetchJson('worldcup.teams.json')
       .then((r) => {
         if (!r.ok) throw new Error(`Failed to load teams (${r.status})`);
         return r.json() as Promise<Team[]>;
