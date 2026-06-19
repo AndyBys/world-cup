@@ -72,3 +72,30 @@ export async function getCurrentOdds(): Promise<Map<string, CurrentOdds>> {
   }
   return idx;
 }
+
+/** One daily snapshot of a team's title-win probability (percent). */
+export interface OddsPoint {
+  /** UTC day, "YYYY-MM-DD". */
+  date: string;
+  /** Title-win prob as a percent (0.183 fraction → 18.3). */
+  prob: number;
+}
+
+/**
+ * Per-team history of bookmaker title-win odds (team → daily points, oldest
+ * first), from team_odds_history. Bookmaker-only and starts the day the trend
+ * feature shipped — there is no pre-tournament backfill.
+ */
+export async function getOddsHistory(): Promise<Map<string, OddsPoint[]>> {
+  const { data } = await supabase
+    .from('team_odds_history')
+    .select('team,snap_date,prob')
+    .order('snap_date', { ascending: true });
+  const idx = new Map<string, OddsPoint[]>();
+  for (const r of (data as { team: string; snap_date: string; prob: number }[]) ?? []) {
+    const arr = idx.get(r.team) ?? [];
+    arr.push({ date: r.snap_date, prob: r.prob * 100 });
+    idx.set(r.team, arr);
+  }
+  return idx;
+}

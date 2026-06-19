@@ -7,6 +7,8 @@
 //   2. Tournament outright ("winner") odds -> team_odds.prob, the *current*
 //      title-win probability shown on the Lobby next to the hardcoded *original*
 //      Opta snapshot. This never reorders the draw — config.teams is untouched.
+//      The same value is also appended to team_odds_history (one row per team
+//      per UTC day) so the Lobby can draw a trend line over the tournament.
 //
 // Maths (both markets): implied prob of an outcome = 1 / decimal-odds. Implied
 // probs sum to >1 (the bookmaker margin / overround), so we remove it by
@@ -231,6 +233,15 @@ Deno.serve(async (req) => {
         const { error } = await supabase.from('team_odds').upsert(rows, { onConflict: 'team' });
         if (error) throw error;
         teamOddsWritten = rows.length;
+
+        // Append one snapshot per team per UTC day for the trend chart. Re-runs
+        // the same day overwrite that day's row via the (team, snap_date) key.
+        const snapDate = now.slice(0, 10); // YYYY-MM-DD (now is an ISO string)
+        const history = rows.map((r) => ({ team: r.team, snap_date: snapDate, prob: r.prob }));
+        const { error: hErr } = await supabase
+          .from('team_odds_history')
+          .upsert(history, { onConflict: 'team,snap_date' });
+        if (hErr) throw hErr;
       }
     } catch (e) {
       outErr = String(e); // surfaced in the response; doesn't fail the h2h sync

@@ -15,7 +15,8 @@ import {
 import { overlayFinished } from '../lib/live';
 import { useLiveScores } from '../lib/useLive';
 import { CURRENCIES, convert, getRates } from '../lib/currency';
-import { poolByOdds, getCurrentOdds, CurrentOdds } from '../lib/pool';
+import { poolByOdds, getCurrentOdds, getOddsHistory, CurrentOdds, OddsPoint } from '../lib/pool';
+import { OddsTrend } from '../components/OddsTrend';
 import { ULTRA_TEAMS } from '../lib/ultra';
 import { TeamPill } from '../components/TeamPill';
 import { TodayMatches } from '../components/TodayMatches';
@@ -200,9 +201,11 @@ function PoolTable({ flags, inPlay }: { flags: Map<string, string>; inPlay: numb
   // Live title-win odds (team → current %), refreshed daily into team_odds.
   // Empty until the first sync — then each row shows "original → current".
   const [now, setNow] = useState<Map<string, CurrentOdds>>(new Map());
+  const [history, setHistory] = useState<Map<string, OddsPoint[]>>(new Map());
   useEffect(() => {
     let alive = true;
     getCurrentOdds().then((m) => alive && setNow(m)).catch(() => {});
+    getOddsHistory().then((m) => alive && setHistory(m)).catch(() => {});
     return () => {
       alive = false;
     };
@@ -267,6 +270,12 @@ function PoolTable({ flags, inPlay }: { flags: Map<string, string>; inPlay: numb
         <p className="muted small pool-updated">
           Котировки букмекеров обновлены {relTime(oddsUpdatedAt)}
         </p>
+      )}
+      {n > 0 && history.size > 0 && (
+        <>
+          <h3 className="pool-trend-title">📈 Как менялись шансы у букмекеров</h3>
+          <OddsTrend history={history} teams={rows.map((r) => r.team)} flags={flags} />
+        </>
       )}
     </section>
   );

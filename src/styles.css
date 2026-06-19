@@ -766,6 +766,18 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 .pool-prob-now.down { color: #e0607a; }  /* odds drifted — team weakened */
 .pool-updated { margin: 10px 0 0; text-align: right; opacity: 0.7; }
 
+/* Bookmaker-odds trend chart (hand-rolled SVG). */
+.pool-trend-title { margin: 22px 0 8px; font-size: 1rem; font-weight: 700; }
+.odds-trend-svg { width: 100%; height: auto; display: block; overflow: visible; }
+.ot-grid { stroke: rgba(255, 255, 255, 0.08); stroke-width: 1; }
+.ot-axis { fill: var(--muted); font-size: 11px; }
+.ot-axis-y { text-anchor: end; }
+.ot-axis-x { text-anchor: middle; }
+.ot-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ot-dot { stroke: var(--bg, #0c0f17); stroke-width: 1; }
+.ot-endlabel { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.odds-trend-hint { margin: 6px 0 0; text-align: center; }
+
 /* ===========================================================================
    Ultra-gamble — the red, blinking, ludomania layer
    =========================================================================== */
