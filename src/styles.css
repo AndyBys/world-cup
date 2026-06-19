@@ -730,7 +730,7 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 .pool-list { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .pool-row {
   display: grid;
-  grid-template-columns: minmax(150px, 1fr) minmax(80px, 2fr) 44px;
+  grid-template-columns: minmax(150px, 1fr) minmax(80px, 2fr) auto;
   align-items: center;
   gap: 12px;
   padding: 7px 8px;
@@ -748,7 +748,22 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--green); }
   border-radius: 999px;
   background: linear-gradient(90deg, var(--gold-deep), var(--gold));
 }
-.pool-prob { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--gold); }
+.pool-prob {
+  text-align: right;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  justify-content: flex-end;
+}
+/* Pre-tournament number is the muted baseline; the live one is the highlight. */
+.pool-prob-start { color: var(--muted); font-weight: 700; }
+.pool-prob-now { color: var(--gold); }
+.pool-prob-now.up { color: #38d39f; }   /* odds shortened — team strengthened */
+.pool-prob-now.down { color: #e0607a; }  /* odds drifted — team weakened */
 
 /* ===========================================================================
    Ultra-gamble — the red, blinking, ludomania layer

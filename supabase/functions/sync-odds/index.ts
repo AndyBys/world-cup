@@ -1,18 +1,25 @@
 // Supabase Edge Function: sync-odds
 // ---------------------------------------------------------------------------
-// Once a day (driven by .github/workflows/sync-odds.yml), pulls 1X2 (h2h)
-// bookmaker odds for the World Cup from The Odds API and writes per-match win
-// probabilities into the `fixtures` table (p1/px/p2 + odds_updated_at).
+// Once a day (driven by .github/workflows/sync-odds.yml) this pulls two markets
+// from The Odds API and writes the derived probabilities back to Postgres:
 //
-// Maths: implied prob of an outcome = 1 / decimal-odds. The three implied probs
-// sum to >1 (the bookmaker margin / overround). We remove it by PROPORTIONAL
-// normalisation — p_i = (1/odds_i) / Σ(1/odds_j) — so p1+px+p2 = 1 and none can
-// go negative. Across the ~20 books returned we take the MEDIAN decimal odds per
-// outcome first, so one book's outlier line can't skew the result.
+//   1. 1X2 (h2h) per-match odds -> fixtures.p1/px/p2 (+ odds_updated_at).
+//   2. Tournament outright ("winner") odds -> team_odds.prob, the *current*
+//      title-win probability shown on the Lobby next to the hardcoded *original*
+//      Opta snapshot. This never reorders the draw — config.teams is untouched.
 //
-// Matching: The Odds API gives English team names + a "Draw" outcome. We key by
-// the unordered canon(team) pair (each WC pairing is unique) to find the fixture
-// row, then orient the two team outcomes to that row's team1/team2.
+// Maths (both markets): implied prob of an outcome = 1 / decimal-odds. Implied
+// probs sum to >1 (the bookmaker margin / overround), so we remove it by
+// PROPORTIONAL normalisation — p_i = (1/odds_i) / Σ(1/odds_j) — so they sum to 1
+// and none can go negative. We take the MEDIAN decimal odds per outcome across
+// all books first, so one book's outlier line can't skew the result. For h2h
+// that field is the three 1/X/2 outcomes; for outrights it's the whole tournament
+// field (so the 20 pool teams correctly do NOT sum to 1 among themselves).
+//
+// Matching: The Odds API gives English team names. h2h keys by the unordered
+// canon(team) pair (each WC pairing is unique); outrights map each team by
+// canon() to the openfootball spelling we store. The outright fetch is
+// best-effort: if it fails the h2h sync still succeeds (and vice-versa).
 //
 // Needs ODDS_API_KEY (function secret) + the auto-injected service-role key.
 // Deploy:  supabase functions deploy sync-odds --no-verify-jwt
@@ -23,6 +30,12 @@ const SPORT = 'soccer_fifa_world_cup';
 const ODDS_URL = (key: string) =>
   `https://api.the-odds-api.com/v4/sports/${SPORT}/odds` +
   `?apiKey=${key}&regions=eu&markets=h2h&oddsFormat=decimal`;
+
+// The outright "winner" futures market lives under its own sport key.
+const WINNER_SPORT = 'soccer_fifa_world_cup_winner';
+const OUTRIGHTS_URL = (key: string) =>
+  `https://api.the-odds-api.com/v4/sports/${WINNER_SPORT}/odds` +
+  `?apiKey=${key}&regions=eu&markets=outrights&oddsFormat=decimal`;
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -106,6 +119,34 @@ function probsFor(ev: OddsEvent): Map<string, number> | null {
   return byName;
 }
 
+/**
+ * Title-win probability per team (canon) from the outright market: median
+ * decimal odds per team across all books/events, implied = 1/odds, then
+ * proportionally normalised across the WHOLE field (so the overround is removed
+ * and the 20 pool teams correctly don't sum to 1 among themselves).
+ */
+function outrightProbs(events: OddsEvent[]): Map<string, number> {
+  const prices = new Map<string, number[]>(); // canon(team) -> decimal odds samples
+  for (const ev of events) {
+    for (const bk of ev.bookmakers ?? []) {
+      const mkt = bk.markets?.find((m) => m.key === 'outrights');
+      if (!mkt) continue;
+      for (const o of mkt.outcomes ?? []) {
+        if (!(o.price > 1)) continue;
+        const arr = prices.get(canon(o.name)) ?? [];
+        arr.push(o.price);
+        prices.set(canon(o.name), arr);
+      }
+    }
+  }
+  const implied = new Map<string, number>();
+  for (const [team, xs] of prices) implied.set(team, 1 / median(xs));
+  const total = [...implied.values()].reduce((a, b) => a + b, 0);
+  const probs = new Map<string, number>();
+  if (total > 0) for (const [team, v] of implied) probs.set(team, v / total);
+  return probs;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -118,8 +159,9 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    const [oddsRes, fxRes] = await Promise.all([
+    const [oddsRes, outRes, fxRes] = await Promise.all([
       fetch(ODDS_URL(apiKey), { headers: { accept: 'application/json' } }),
+      fetch(OUTRIGHTS_URL(apiKey), { headers: { accept: 'application/json' } }),
       supabase.from('fixtures').select('match_key,team1,team2'),
     ]);
     if (!oddsRes.ok) throw new Error(`odds-api ${oddsRes.status}`);
@@ -167,11 +209,40 @@ Deno.serve(async (req) => {
     const failed = results.find((r) => r.error);
     if (failed?.error) throw failed.error;
 
+    // --- Outright title-win probabilities -> team_odds (best-effort) ----------
+    // canon(team) -> the openfootball spelling we store, learned from fixtures so
+    // team_odds rows key the same way as config.teams / src/lib/pool.ts.
+    const nameByCanon = new Map<string, string>();
+    for (const f of fixtures) {
+      nameByCanon.set(canon(f.team1), f.team1);
+      nameByCanon.set(canon(f.team2), f.team2);
+    }
+    let teamOddsWritten = 0;
+    let outErr: string | null = null;
+    try {
+      if (!outRes.ok) throw new Error(`odds-api outrights ${outRes.status}`);
+      const outEvents = (await outRes.json()) as OddsEvent[];
+      const probs = outrightProbs(outEvents);
+      const rows = [...probs]
+        .map(([c, prob]) => ({ team: nameByCanon.get(c), prob }))
+        .filter((r): r is { team: string; prob: number } => !!r.team)
+        .map((r) => ({ team: r.team, prob: r.prob, updated_at: now }));
+      if (rows.length) {
+        const { error } = await supabase.from('team_odds').upsert(rows, { onConflict: 'team' });
+        if (error) throw error;
+        teamOddsWritten = rows.length;
+      }
+    } catch (e) {
+      outErr = String(e); // surfaced in the response; doesn't fail the h2h sync
+    }
+
     return new Response(
       JSON.stringify({
         ok: true,
         events: events.length,
         updated: updates.length,
+        teamOddsWritten,
+        outErr,
         unmatched,
       }),
       { headers: { ...cors, 'content-type': 'application/json' } },

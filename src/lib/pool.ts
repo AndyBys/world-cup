@@ -9,6 +9,13 @@
 //
 // Stored as raw decimals (e.g. 16.1) and displayed rounded (16.1 → 16%).
 // `team` names must match openfootball spelling (USA, not "United States").
+//
+// These are the ORIGINAL pre-tournament numbers and also fix the draw order
+// (config.teams). The CURRENT live numbers come from the `team_odds` table —
+// see getCurrentOdds() below — and are shown alongside these, never replacing
+// them. The draw is unaffected by the live odds.
+
+import { supabase } from './supabase';
 
 export interface PoolTeam {
   team: string;
@@ -42,4 +49,26 @@ export const POOL: PoolTeam[] = [
 /** Pool sorted strongest-first. */
 export function poolByOdds(): PoolTeam[] {
   return [...POOL].sort((a, b) => b.prob - a.prob);
+}
+
+/** Live title-win probability for one team (raw percent, e.g. 18.3 for 18.3%). */
+export interface CurrentOdds {
+  /** Percent, comparable to PoolTeam.prob (so 0.183 fraction → 18.3). */
+  prob: number;
+  updated_at: string;
+}
+
+/**
+ * Current bookmaker title-win odds by team, refreshed daily by the sync-odds
+ * Edge Function into `team_odds`. Returns an empty map until the first sync
+ * (the Lobby then just shows the original numbers). Stored as a 0..1 fraction;
+ * scaled here to percent to match PoolTeam.prob.
+ */
+export async function getCurrentOdds(): Promise<Map<string, CurrentOdds>> {
+  const { data } = await supabase.from('team_odds').select('team,prob,updated_at');
+  const idx = new Map<string, CurrentOdds>();
+  for (const r of (data as { team: string; prob: number; updated_at: string }[]) ?? []) {
+    idx.set(r.team, { prob: r.prob * 100, updated_at: r.updated_at });
+  }
+  return idx;
 }

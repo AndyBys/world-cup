@@ -15,7 +15,7 @@ import {
 import { overlayFinished } from '../lib/live';
 import { useLiveScores } from '../lib/useLive';
 import { CURRENCIES, convert, getRates } from '../lib/currency';
-import { poolByOdds } from '../lib/pool';
+import { poolByOdds, getCurrentOdds, CurrentOdds } from '../lib/pool';
 import { ULTRA_TEAMS } from '../lib/ultra';
 import { TeamPill } from '../components/TeamPill';
 import { TodayMatches } from '../components/TodayMatches';
@@ -197,14 +197,25 @@ function PoolTable({ flags, inPlay }: { flags: Map<string, string>; inPlay: numb
   const rows = all.slice(0, n);
   const max = all[0]?.prob ?? 1; // scale bars against the strongest team overall
 
+  // Live title-win odds (team → current %), refreshed daily into team_odds.
+  // Empty until the first sync — then each row shows "original → current".
+  const [now, setNow] = useState<Map<string, CurrentOdds>>(new Map());
+  useEffect(() => {
+    let alive = true;
+    getCurrentOdds().then((m) => alive && setNow(m)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   return (
     <section className="card pool-card">
       <h2>🎟️ В розыгрыше сейчас — {n} {plural(n, 'команда', 'команды', 'команд')}</h2>
       <p className="muted small">
         Случайно раздаём именно из этих команд — по одной на человека. Сейчас
         зарегано {inPlay}, поэтому в игре топ-{n}. Зайдёт больше друзей —
-        добавятся следующие по силе. Проценты — текущие шансы букмекеров выиграть
-        ЧМ.
+        добавятся следующие по силе. Слева — прогноз Opta перед турниром, справа
+        (если есть) — текущие котировки букмекеров.
       </p>
       {n === 0 ? (
         <p className="muted small pool-empty">
@@ -213,18 +224,32 @@ function PoolTable({ flags, inPlay }: { flags: Map<string, string>; inPlay: numb
         </p>
       ) : (
         <ul className="pool-list">
-          {rows.map((r) => (
-            <li key={r.team} className="pool-row">
-              <Link className="pool-team" to={`/team/${encodeURIComponent(r.team)}`}>
-                <span className="pool-flag">{flags.get(r.team) ?? '⚽'}</span>
-                <span className="pool-name">{r.team}</span>
-              </Link>
-              <span className="pool-bar-wrap">
-                <span className="pool-bar" style={{ width: `${(r.prob / max) * 100}%` }} />
-              </span>
-              <span className="pool-prob">{Math.round(r.prob)}%</span>
-            </li>
-          ))}
+          {rows.map((r) => {
+            const cur = now.get(r.team);
+            const moved = cur ? Math.round(cur.prob) - Math.round(r.prob) : 0;
+            return (
+              <li key={r.team} className="pool-row">
+                <Link className="pool-team" to={`/team/${encodeURIComponent(r.team)}`}>
+                  <span className="pool-flag">{flags.get(r.team) ?? '⚽'}</span>
+                  <span className="pool-name">{r.team}</span>
+                </Link>
+                <span className="pool-bar-wrap">
+                  <span className="pool-bar" style={{ width: `${(r.prob / max) * 100}%` }} />
+                </span>
+                <span className="pool-prob">
+                  <span className={cur ? 'pool-prob-start' : ''}>{Math.round(r.prob)}%</span>
+                  {cur && (
+                    <span
+                      className={`pool-prob-now ${moved > 0 ? 'up' : moved < 0 ? 'down' : ''}`}
+                      title={`Котировки букмекеров сейчас (прогноз Opta был ${Math.round(r.prob)}%)`}
+                    >
+                      → {Math.round(cur.prob)}%
+                    </span>
+                  )}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
