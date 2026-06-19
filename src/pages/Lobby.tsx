@@ -208,6 +208,17 @@ function PoolTable({ flags, inPlay }: { flags: Map<string, string>; inPlay: numb
     };
   }, []);
 
+  // Newest team_odds.updated_at across the shown teams — "когда букмекеры
+  // обновлялись". Empty until the first sync, then drives the footnote below.
+  const oddsUpdatedAt = useMemo(() => {
+    let latest = 0;
+    for (const r of rows) {
+      const t = now.get(r.team);
+      if (t) latest = Math.max(latest, Date.parse(t.updated_at));
+    }
+    return latest || null;
+  }, [rows, now]);
+
   return (
     <section className="card pool-card">
       <h2>🎟️ В розыгрыше сейчас — {n} {plural(n, 'команда', 'команды', 'команд')}</h2>
@@ -252,8 +263,24 @@ function PoolTable({ flags, inPlay }: { flags: Map<string, string>; inPlay: numb
           })}
         </ul>
       )}
+      {oddsUpdatedAt && (
+        <p className="muted small pool-updated">
+          Котировки букмекеров обновлены {relTime(oddsUpdatedAt)}
+        </p>
+      )}
     </section>
   );
+}
+
+/** Compact Russian "time ago": «только что» / «N мин назад» / «N ч назад» / date. */
+function relTime(ms: number): string {
+  const diff = Date.now() - ms;
+  const min = Math.round(diff / 60000);
+  if (min < 1) return 'только что';
+  if (min < 60) return `${min} ${plural(min, 'минуту', 'минуты', 'минут')} назад`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr} ${plural(hr, 'час', 'часа', 'часов')} назад`;
+  return new Date(ms).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
 }
 
 /** Russian plural picker: plural(n, "команда", "команды", "команд"). */

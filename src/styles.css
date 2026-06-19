@@ -764,6 +764,7 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 .pool-prob-now { color: var(--gold); }
 .pool-prob-now.up { color: #38d39f; }   /* odds shortened — team strengthened */
 .pool-prob-now.down { color: #e0607a; }  /* odds drifted — team weakened */
+.pool-updated { margin: 10px 0 0; text-align: right; opacity: 0.7; }
 
 /* ===========================================================================
    Ultra-gamble — the red, blinking, ludomania layer
