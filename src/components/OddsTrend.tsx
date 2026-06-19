@@ -3,7 +3,11 @@
 // the dark/gold theme and stays light. Data is team_odds_history via
 // getOddsHistory(); the series starts the day the trend feature shipped and
 // grows one point per day — so with a single day it shows dots + a hint.
+//
+// Interactive: click a team in the legend to hide/show its line; once enough
+// days have accumulated a range toggle (7д / всё) appears.
 
+import { useMemo, useState } from 'react';
 import { OddsPoint } from '../lib/pool';
 
 const COLORS = [
@@ -17,6 +21,7 @@ const H = 340;
 const PAD = { top: 16, right: 70, bottom: 28, left: 34 };
 const innerW = W - PAD.left - PAD.right;
 const innerH = H - PAD.top - PAD.bottom;
+const DAY = 86_400_000;
 
 const ddmm = (iso: string) => {
   const [, m, d] = iso.split('-');
@@ -32,31 +37,57 @@ export function OddsTrend({
   teams: string[];
   flags: Map<string, string>;
 }) {
-  // Only plot teams we actually have history for.
-  const series = teams
-    .map((team, i) => ({ team, pts: history.get(team) ?? [], color: COLORS[i % COLORS.length] }))
+  // Stable colour per team (by draw order, independent of what's visible).
+  const colorOf = useMemo(() => {
+    const m = new Map<string, string>();
+    teams.forEach((t, i) => m.set(t, COLORS[i % COLORS.length]));
+    return m;
+  }, [teams]);
+
+  // Teams we actually have any history for — the legend / chart universe.
+  const available = useMemo(() => teams.filter((t) => (history.get(t)?.length ?? 0) > 0), [teams, history]);
+
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [rangeDays, setRangeDays] = useState<number | null>(null); // null = all
+
+  // Full date span (across all available teams) decides whether a range toggle
+  // is worth showing, and the cutoff when one is active.
+  const allDates = useMemo(
+    () => [...new Set(available.flatMap((t) => (history.get(t) ?? []).map((p) => p.date)))].sort(),
+    [available, history],
+  );
+  const spanDays = allDates.length > 1 ? (Date.parse(allDates[allDates.length - 1]) - Date.parse(allDates[0])) / DAY : 0;
+  const showRange = spanDays > 7;
+  const cutoff = rangeDays && allDates.length
+    ? Date.parse(allDates[allDates.length - 1]) - rangeDays * DAY
+    : -Infinity;
+
+  if (available.length === 0) return null;
+
+  // Visible series, with points clipped to the selected range.
+  const series = available
+    .filter((t) => !hidden.has(t))
+    .map((team) => ({
+      team,
+      color: colorOf.get(team)!,
+      pts: (history.get(team) ?? []).filter((p) => Date.parse(p.date) >= cutoff),
+    }))
     .filter((s) => s.pts.length > 0);
 
-  if (series.length === 0) return null;
-
-  // Unique sorted days across all plotted teams → the x axis.
   const dates = [...new Set(series.flatMap((s) => s.pts.map((p) => p.date)))].sort();
-  const tMin = Date.parse(dates[0]);
-  const tMax = Date.parse(dates[dates.length - 1]);
+  const tMin = dates.length ? Date.parse(dates[0]) : 0;
+  const tMax = dates.length ? Date.parse(dates[dates.length - 1]) : 0;
   const span = tMax - tMin;
 
-  const maxProb = Math.max(...series.flatMap((s) => s.pts.map((p) => p.prob)));
-  const yMax = Math.max(5, Math.ceil(maxProb / 5) * 5); // round up to a clean 5%
+  const maxProb = series.length ? Math.max(...series.flatMap((s) => s.pts.map((p) => p.prob))) : 5;
+  const yMax = Math.max(5, Math.ceil(maxProb / 5) * 5);
 
   const x = (iso: string) =>
     span === 0 ? PAD.left + innerW / 2 : PAD.left + ((Date.parse(iso) - tMin) / span) * innerW;
   const y = (prob: number) => PAD.top + innerH - (prob / yMax) * innerH;
 
-  // y gridlines / ticks at 0, 5, 10, … up to yMax.
   const yTicks: number[] = [];
   for (let v = 0; v <= yMax; v += 5) yTicks.push(v);
-
-  // x ticks: every day if few, otherwise ~6 evenly spaced.
   const step = dates.length <= 6 ? 1 : Math.ceil(dates.length / 6);
   const xTicks = dates.filter((_, i) => i % step === 0 || i === dates.length - 1);
 
@@ -71,27 +102,45 @@ export function OddsTrend({
   for (let i = 1; i < labels.length; i++) {
     if (labels[i].y < labels[i - 1].y + GAP) labels[i].y = labels[i - 1].y + GAP;
   }
-  // Clamp the stack back inside the plot if it overflowed the bottom.
   const overflow = labels.length ? labels[labels.length - 1].y - (PAD.top + innerH) : 0;
   if (overflow > 0) for (const l of labels) l.y -= overflow;
 
   const singleDay = dates.length < 2;
 
+  const toggle = (team: string) =>
+    setHidden((prev) => {
+      const next = new Set(prev);
+      next.has(team) ? next.delete(team) : next.add(team);
+      return next;
+    });
+
   return (
     <div className="odds-trend">
+      {showRange && (
+        <div className="ot-range" role="group" aria-label="Диапазон">
+          {([[7, '7 дней'], [null, 'всё']] as const).map(([d, label]) => (
+            <button
+              key={label}
+              type="button"
+              className={`ot-range-btn ${rangeDays === d ? 'active' : ''}`}
+              onClick={() => setRangeDays(d)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Динамика котировок букмекеров по дням" className="odds-trend-svg">
-        {/* y gridlines + labels */}
         {yTicks.map((v) => (
           <g key={`y${v}`}>
             <line x1={PAD.left} y1={y(v)} x2={PAD.left + innerW} y2={y(v)} className="ot-grid" />
             <text x={PAD.left - 6} y={y(v) + 3} className="ot-axis ot-axis-y">{v}%</text>
           </g>
         ))}
-        {/* x labels */}
         {xTicks.map((d) => (
           <text key={`x${d}`} x={x(d)} y={H - 8} className="ot-axis ot-axis-x">{ddmm(d)}</text>
         ))}
-        {/* one line + dots per team */}
         {series.map((s) => (
           <g key={s.team}>
             {s.pts.length > 1 && (
@@ -108,13 +157,33 @@ export function OddsTrend({
             ))}
           </g>
         ))}
-        {/* end-of-line labels */}
         {labels.map((l) => (
           <text key={l.team} x={PAD.left + innerW + 8} y={l.y + 3} className="ot-endlabel" fill={l.color}>
             {l.flag} {Math.round(l.prob)}%
           </text>
         ))}
       </svg>
+
+      {/* Legend — click a team to hide/show its line. */}
+      <div className="ot-legend">
+        {available.map((team) => {
+          const off = hidden.has(team);
+          return (
+            <button
+              key={team}
+              type="button"
+              className={`ot-legend-item ${off ? 'off' : ''}`}
+              onClick={() => toggle(team)}
+              aria-pressed={!off}
+              title={off ? 'Показать на графике' : 'Скрыть с графика'}
+            >
+              <span className="ot-legend-swatch" style={{ background: off ? 'transparent' : colorOf.get(team) }} />
+              {flags.get(team) ?? ''} {team}
+            </button>
+          );
+        })}
+      </div>
+
       {singleDay && (
         <p className="muted small odds-trend-hint">
           Пока только один замер — линии появятся, когда накопится история (по точке в день).

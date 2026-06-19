@@ -778,6 +778,29 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 .ot-endlabel { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .odds-trend-hint { margin: 6px 0 0; text-align: center; }
 
+/* Range toggle (7д / всё) */
+.ot-range { display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 6px; }
+.ot-range-btn {
+  padding: 3px 10px; border-radius: 999px; cursor: pointer;
+  background: rgba(255, 255, 255, 0.05); color: var(--muted);
+  border: 1px solid rgba(255, 255, 255, 0.12); font-size: 12px;
+}
+.ot-range-btn.active { background: var(--gold-deep); color: #1a1206; border-color: var(--gold); font-weight: 700; }
+
+/* Clickable legend — toggles a line on/off */
+.ot-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; justify-content: center; }
+.ot-legend-item {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px; border-radius: 999px; cursor: pointer; font-size: 12px;
+  background: rgba(255, 255, 255, 0.05); color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.ot-legend-item.off { color: var(--muted); opacity: 0.55; text-decoration: line-through; }
+.ot-legend-swatch {
+  width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
 /* ===========================================================================
    Ultra-gamble — the red, blinking, ludomania layer
    =========================================================================== */
