@@ -9,6 +9,7 @@ import {
   hostFlag,
   kickoffMs,
   matchStatus,
+  displayScore,
   Match,
 } from '../lib/worldcup';
 import { liveFor, scorerLines, LiveIndex } from '../lib/live';
@@ -149,7 +150,8 @@ function Fixture({
   const info = liveFor(m, liveIdx);
   const status = info?.phase ?? matchStatus(m, now);
   const isLive = status === 'live';
-  const ft = isLive ? info?.ft : m.score?.ft ?? info?.ft;
+  const ds = !isLive && m.score?.ft ? displayScore(m) : null;
+  const ft = isLive ? info?.ft : ds?.ft ?? info?.ft;
   const fx = fixtures.get(matchKey(m));
   const o1 = owners.get(m.team1);
   const o2 = owners.get(m.team2);
@@ -187,7 +189,14 @@ function Fixture({
       </span>
       <span className="fx-match">
         {side(m.team1, o1)}
-        <span className="fx-score">{ft ? `${ft[0]}–${ft[1]}` : 'v'}</span>
+        <span className="fx-score">
+          {ft ? `${ft[0]}–${ft[1]}` : 'v'}
+          {ds?.pens ? (
+            <span className="score-extra"> ({ds.pens[0]}–{ds.pens[1]} pen)</span>
+          ) : ds?.aet ? (
+            <span className="score-extra"> a.e.t.</span>
+          ) : null}
+        </span>
         {side(m.team2, o2)}
       </span>
       <span className="fx-meta">

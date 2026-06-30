@@ -26,8 +26,10 @@ async function fetchJson(file: string, cacheBust = false): Promise<Response> {
 }
 
 export interface Score {
-  ft?: [number, number];
-  ht?: [number, number];
+  ft?: [number, number]; // 90-minute (full-time) score
+  ht?: [number, number]; // half-time score
+  et?: [number, number]; // aggregate after extra time — knockouts only
+  p?: [number, number]; // penalty-shootout score — knockouts only
 }
 
 /** A goal from openfootball, e.g. { name: "Kai Havertz", minute: "45+5", penalty: true }. */
@@ -231,14 +233,69 @@ function feederNums(m: Match): number[] {
     .map(Number);
 }
 
+/**
+ * Winning side of a *played* match: 1 = team1, 2 = team2, or 0 while still level
+ * (a genuine group-stage draw). Knockout ties are broken the way the tournament
+ * breaks them — penalty shootout has the final say, then the after-extra-time
+ * aggregate, then the 90-minute score — so a 1-1 settled on penalties resolves to
+ * whoever won the shootout rather than reading as a draw.
+ */
+export function winningSide(m: Match): 0 | 1 | 2 {
+  const s = m.score;
+  if (!s?.ft) return 0;
+  const [a, b] = s.p ?? s.et ?? s.ft;
+  return a > b ? 1 : a < b ? 2 : 0;
+}
+
+/**
+ * Score to show for a finished match, with knockout tie-breaks resolved:
+ *   - `ft`   headline pair — the after-extra-time aggregate when a match went to
+ *            ET, otherwise the 90-minute score.
+ *   - `pens` penalty-shootout score, present only when a shootout decided it.
+ *   - `aet`  true when extra time (without penalties) settled it.
+ * Returns null if the match has no full-time score yet.
+ */
+export function displayScore(
+  m: Match,
+): { ft: [number, number]; pens?: [number, number]; aet: boolean } | null {
+  const s = m.score;
+  if (!s?.ft) return null;
+  if (s.p) return { ft: s.et ?? s.ft, pens: s.p, aet: false };
+  if (s.et) return { ft: s.et, aet: true };
+  return { ft: s.ft, aet: false };
+}
+
 export async function getBracket(): Promise<Bracket> {
   const matches = await getMatches();
   const ko = matches.filter((m) => !m.group);
   const byNum = new Map<number, Match>();
   ko.forEach((m, i) => byNum.set(73 + i, m)); // group stage = matches 1..72
 
+  // Resolve a "W<n>"/"L<n>" feeder slot to the team that won/lost match <n>,
+  // so a decided tie advances in our bracket immediately — openfootball only
+  // rewrites these placeholders with a lag (and skips ones settled on penalties).
+  const resolveSlot = (slot: string): string => {
+    const ref = /^([WL])(\d+)$/.exec(slot);
+    if (!ref) return slot;
+    const feeder = byNum.get(Number(ref[2]));
+    if (!feeder) return slot;
+    const side = winningSide(feeder);
+    if (side === 0) return slot; // not decided yet → keep the placeholder
+    const won = side === 1 ? feeder.team1 : feeder.team2;
+    const lost = side === 1 ? feeder.team2 : feeder.team1;
+    const picked = ref[1] === 'W' ? won : lost;
+    // A played match always has real team names, but guard against ever
+    // surfacing a still-unresolved placeholder as though it were a team.
+    return /^[WL]\d+$|^\d|\//.test(picked) ? slot : picked;
+  };
+  const resolve = (m: Match): Match => {
+    const team1 = resolveSlot(m.team1);
+    const team2 = resolveSlot(m.team2);
+    return team1 === m.team1 && team2 === m.team2 ? m : { ...m, team1, team2 };
+  };
+
   const build = (m: Match): BNode => ({
-    match: m,
+    match: resolve(m),
     children: feederNums(m)
       .map((n) => byNum.get(n))
       .filter((x): x is Match => !!x)
@@ -258,11 +315,12 @@ export async function getBracket(): Promise<Bracket> {
   }
 
   const final = ko.find((m) => m.round === 'Final');
-  const third = ko.find((m) => m.round === 'Match for third place');
+  const thirdRaw = ko.find((m) => m.round === 'Match for third place');
+  const third = thirdRaw ? resolve(thirdRaw) : undefined; // L101/L102 → the semi-final losers
   if (!final) return { third, ranges };
 
   const root = build(final);
-  return { left: root.children[0], right: root.children[1], final, third, ranges };
+  return { left: root.children[0], right: root.children[1], final: root.match, third, ranges };
 }
 
 /** True once a match has a final-time score. */
@@ -304,16 +362,16 @@ export function matchStatus(m: Match, now: number = Date.now()): MatchStatus {
   return 'finished'; // window has passed; score simply not in the feed yet
 }
 
-/** 'W' | 'D' | 'L' from the perspective of `team`, or null if not yet played. */
+/**
+ * 'W' | 'D' | 'L' from the perspective of `team`, or null if not yet played.
+ * Knockout ties decided in extra time or on penalties count as a win/loss, not a
+ * draw — so a team knocked out on penalties reads 'L' (and is out of the pot).
+ */
 export function resultFor(m: Match, team: string): 'W' | 'D' | 'L' | null {
   if (!m.score?.ft) return null;
-  const [g1, g2] = m.score.ft;
-  const isHome = m.team1 === team;
-  const my = isHome ? g1 : g2;
-  const opp = isHome ? g2 : g1;
-  if (my > opp) return 'W';
-  if (my < opp) return 'L';
-  return 'D';
+  const side = winningSide(m);
+  if (side === 0) return 'D';
+  return (side === 1) === (m.team1 === team) ? 'W' : 'L';
 }
 
 export interface TeamResult {

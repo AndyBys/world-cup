@@ -7,6 +7,8 @@ import {
   shortGround,
   shortDate,
   hostFlag,
+  winningSide,
+  displayScore,
 } from '../lib/worldcup';
 import { liveFor, LiveIndex } from '../lib/live';
 import { OwnerIndex } from '../lib/owners';
@@ -158,18 +160,24 @@ function MatchBox({
 }) {
   const info = liveFor(m, liveIdx);
   const isLive = (info?.phase ?? matchStatus(m, now)) === 'live';
-  // Prefer the live feed's score (covers in-progress and finished-but-not-yet-
-  // in-openfootball); fall back to openfootball's final score.
-  const ft = isLive ? info?.ft : m.score?.ft ?? info?.ft;
-  const winner = ft && !isLive ? (ft[0] > ft[1] ? 1 : ft[0] < ft[1] ? 2 : 0) : 0;
+  // Openfootball's resolved result (extra time / penalties applied) once it has a
+  // final score; fall back to the live feed for a game finished but not yet in
+  // openfootball.
+  const ds = !isLive && m.score?.ft ? displayScore(m) : null;
+  const ft = isLive ? info?.ft : ds?.ft ?? info?.ft;
+  const pens = ds?.pens;
+  // Winner respects ET/penalties when we have openfootball's score; for a
+  // live-feed-only final, the level-90' score is the best signal available.
+  const winner =
+    isLive || !ft ? 0 : ds ? winningSide(m) : ft[0] > ft[1] ? 1 : ft[0] < ft[1] ? 2 : 0;
   const o1 = owners.get(m.team1);
   const o2 = owners.get(m.team2);
   const clash = !!o1 && !!o2; // two friends' teams meet — the moment we want
   return (
     <div className={`mbox ${variant ?? ''} ${isLive ? 'live' : ''} ${clash ? 'clash' : ''}`}>
       {clash && <div className="clash-ribbon">⚔️ {o1} vs {o2}</div>}
-      <Side name={m.team1} flags={flags} score={ft?.[0]} win={winner === 1} owner={o1} />
-      <Side name={m.team2} flags={flags} score={ft?.[1]} win={winner === 2} owner={o2} />
+      <Side name={m.team1} flags={flags} score={ft?.[0]} pens={pens?.[0]} win={winner === 1} owner={o1} />
+      <Side name={m.team2} flags={flags} score={ft?.[1]} pens={pens?.[1]} win={winner === 2} owner={o2} />
       <div className="mbox-foot">
         {isLive ? (
           <span className="mbox-live">
@@ -190,12 +198,14 @@ function Side({
   name,
   flags,
   score,
+  pens,
   win,
   owner,
 }: {
   name: string;
   flags: Map<string, string>;
   score?: number;
+  pens?: number;
   win: boolean;
   owner?: string;
 }) {
@@ -207,7 +217,12 @@ function Side({
         {flag ? name : prettySlot(name)}
         {owner && <span className="mside-owner">🎟️ {owner}</span>}
       </span>
-      {score !== undefined && <span className="mside-score">{score}</span>}
+      {score !== undefined && (
+        <span className="mside-score">
+          {score}
+          {pens !== undefined && <span className="mside-pens"> ({pens})</span>}
+        </span>
+      )}
     </>
   );
   const cls = `mside ${win ? 'win' : ''} ${flag ? 'real' : 'placeholder'} ${owner ? 'owned' : ''}`;

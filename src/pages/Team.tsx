@@ -11,6 +11,7 @@ import {
   matchStatus,
   kickoffMs,
   resultFor,
+  displayScore,
   Match,
   Team as TeamInfo,
 } from '../lib/worldcup';
@@ -195,7 +196,8 @@ function MatchRow({
 }) {
   const info = liveFor(m, idx);
   const isLive = (info?.phase ?? matchStatus(m, now)) === 'live';
-  const ft = isLive ? info?.ft : m.score?.ft;
+  const ds = !isLive && m.score?.ft ? displayScore(m) : null;
+  const ft = isLive ? info?.ft : ds?.ft;
   const outcome = resultFor(m, team);
   // Scorers grouped by team (one line each), with flags so it's clear who scored
   // for whom. Live feed while in progress; openfootball's permanent list at FT.
@@ -214,6 +216,11 @@ function MatchRow({
         {ft ? (
           <span className="score">
             {ft[0]}–{ft[1]}
+            {ds?.pens ? (
+              <span className="score-extra"> ({ds.pens[0]}–{ds.pens[1]} pen)</span>
+            ) : ds?.aet ? (
+              <span className="score-extra"> a.e.t.</span>
+            ) : null}
           </span>
         ) : (
           <span className="vs">v</span>
