@@ -448,6 +448,7 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 .match-teams { display: flex; align-items: center; gap: 12px; font-weight: 600; }
 .match-teams .score { font-weight: 800; font-size: 1.1rem; color: #fff; }
 .match-teams .vs { color: var(--muted); font-weight: 500; }
+.score-extra { font-weight: 600; font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
 .me-team { color: var(--gold); }
 .match-when { font-size: 0.85rem; color: var(--muted); }
 .match-ground { font-size: 0.8rem; }
@@ -1082,7 +1083,8 @@ a.mside:hover .mside-name { color: var(--green); }
 }
 .mside.placeholder .mside-name { color: var(--muted); font-weight: 500; font-style: italic; }
 .mside.win .mside-name { color: var(--gold); }
-.mside-score { font-weight: 800; color: #fff; min-width: 1ch; text-align: right; }
+.mside-score { font-weight: 800; color: #fff; min-width: 1ch; text-align: right; white-space: nowrap; }
+.mside-pens { font-weight: 600; font-size: 0.78em; color: var(--gold); }
 
 /* Box footer: date + venue */
 .mbox-foot {

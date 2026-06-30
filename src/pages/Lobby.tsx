@@ -8,6 +8,7 @@ import {
   recentResults,
   stageLabel,
   shortDate,
+  displayScore,
   Team,
   Match,
   TeamResult,
@@ -511,20 +512,30 @@ function FormDots({
     <div className="form-dots">
       {results.map((r, i) => {
         const opp = r.match.team1 === team ? r.match.team2 : r.match.team1;
-        const ft = r.match.score!.ft!;
-        const score = r.match.team1 === team ? `${ft[0]}–${ft[1]}` : `${ft[1]}–${ft[0]}`;
+        const home = r.match.team1 === team;
+        const ds = displayScore(r.match);
+        const ft = ds?.ft ?? r.match.score!.ft!;
+        const score = home ? `${ft[0]}–${ft[1]}` : `${ft[1]}–${ft[0]}`;
+        // Knockout tie-break, oriented to this team's perspective.
+        const extra = ds?.pens
+          ? home
+            ? ` (${ds.pens[0]}–${ds.pens[1]} pen)`
+            : ` (${ds.pens[1]}–${ds.pens[0]} pen)`
+          : ds?.aet
+            ? ' a.e.t.'
+            : '';
         return (
           <Link
             key={i}
             className="form-dot-wrap"
             to={`/team/${encodeURIComponent(team)}`}
-            aria-label={`${OUTCOME_RU[r.outcome]} ${score} ${opp}`}
+            aria-label={`${OUTCOME_RU[r.outcome]} ${score}${extra} ${opp}`}
           >
             <span className={`form-dot ${r.outcome}`} />
             <span className="form-popup" role="tooltip">
               <span className="form-popup-row">
                 <span className="fp-team-flag">{flags.get(team) ?? '⚽'}</span>
-                <span className="fp-score">{score}</span>
+                <span className="fp-score">{score}{extra}</span>
                 <span className="fp-opp">
                   {flags.get(opp) ?? '⚽'} {opp}
                 </span>
