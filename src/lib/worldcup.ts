@@ -226,11 +226,41 @@ export interface Bracket {
   ranges: Record<string, string>;
 }
 
-function feederNums(m: Match): number[] {
+/**
+ * The knockout round each match's two feeders come from. The Final and the
+ * third-place play-off both feed from the Semi-finals; the Round of 32 is fed by
+ * the group stage (which the draw doesn't show), so it has no knockout feeders.
+ */
+const FEEDER_ROUND: Record<string, string> = {
+  'Round of 16': 'Round of 32',
+  'Quarter-final': 'Round of 16',
+  'Semi-final': 'Quarter-final',
+  Final: 'Semi-final',
+  'Match for third place': 'Semi-final',
+};
+
+/**
+ * The two feeder match numbers for a knockout match. Uses openfootball's
+ * "W<n>"/"L<n>" placeholders while they're still present, but openfootball
+ * rewrites a slot to the real team once that feeder is decided — at which point
+ * the "W<n>" ref is gone. When that happens we recover the feeder by finding the
+ * team's match in the previous knockout round. Without this fallback, every match
+ * openfootball has resolved loses its children and the whole subtree below it
+ * disappears from the draw.
+ */
+function feederNums(m: Match, byNum: Map<number, Match>): number[] {
+  const prev = FEEDER_ROUND[m.round];
+  if (!prev) return []; // Round of 32 — a leaf fed by the group stage.
   return [m.team1, m.team2]
-    .map((s) => /^W(\d+)$/.exec(s)?.[1])
-    .filter((x): x is string => !!x)
-    .map(Number);
+    .map((slot) => {
+      const ref = /^[WL](\d+)$/.exec(slot);
+      if (ref) return Number(ref[1]);
+      for (const [n, f] of byNum) {
+        if (f.round === prev && (f.team1 === slot || f.team2 === slot)) return n;
+      }
+      return null;
+    })
+    .filter((n): n is number => n != null);
 }
 
 /**
@@ -296,7 +326,7 @@ export async function getBracket(): Promise<Bracket> {
 
   const build = (m: Match): BNode => ({
     match: resolve(m),
-    children: feederNums(m)
+    children: feederNums(m, byNum)
       .map((n) => byNum.get(n))
       .filter((x): x is Match => !!x)
       .map(build),
