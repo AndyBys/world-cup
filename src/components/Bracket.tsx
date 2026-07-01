@@ -22,6 +22,41 @@ const FRACTIONS: [string, string][] = [
   ['1/2', 'Semi-final'],
 ];
 
+// Rounds in reading order for the stacked mobile view (round name → heading).
+const ROUND_ORDER: [string, string][] = [
+  ['Round of 32', 'Round of 32'],
+  ['Round of 16', 'Round of 16'],
+  ['Quarter-final', 'Quarter-finals'],
+  ['Semi-final', 'Semi-finals'],
+  ['Final', 'Final'],
+  ['Match for third place', '3rd-place play-off'],
+];
+
+/**
+ * Flattens the draw into rounds for the mobile view: every match in the tree,
+ * grouped by round in reading order, chronological within each round. Reuses the
+ * already-resolved matches so it shows the same teams/scores as the desktop sheet.
+ */
+function roundList(data: BracketData): { round: string; label: string; matches: Match[] }[] {
+  const all: Match[] = [];
+  const walk = (n?: BNode) => {
+    if (!n) return;
+    all.push(n.match);
+    n.children.forEach(walk);
+  };
+  walk(data.left);
+  walk(data.right);
+  if (data.final) all.push(data.final);
+  if (data.third) all.push(data.third);
+  return ROUND_ORDER.map(([round, label]) => ({
+    round,
+    label,
+    matches: all
+      .filter((m) => m.round === round)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)),
+  })).filter((r) => r.matches.length > 0);
+}
+
 /**
  * Two-sided knockout draw sheet (tennis style): the top half flows right toward
  * the centre, the bottom half flows left, meeting at the Final. Connector lines
@@ -90,6 +125,31 @@ export function Bracket({
             <Node node={data.right} side="right" flags={flags} now={now} liveIdx={liveIdx} owners={owners} />
           </div>
         )}
+      </div>
+
+      {/* Stacked round-by-round view — shown only on narrow screens (see CSS). */}
+      <div className="draw-rounds">
+        {roundList(data).map(({ round, label, matches }) => (
+          <section className="dr-round" key={round}>
+            <h3 className="dr-title">
+              <span>{label}</span>
+              {data.ranges[round] && <span className="dr-range">{data.ranges[round]}</span>}
+            </h3>
+            <div className="dr-matches">
+              {matches.map((m, i) => (
+                <MatchBox
+                  key={i}
+                  m={m}
+                  flags={flags}
+                  now={now}
+                  liveIdx={liveIdx}
+                  owners={owners}
+                  variant={round === 'Final' ? 'final' : round === 'Match for third place' ? 'third' : undefined}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
     </div>
   );
